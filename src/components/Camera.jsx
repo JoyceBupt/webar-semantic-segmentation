@@ -1,38 +1,27 @@
-import { useEffect, useRef, useState } from 'react'; import * as tf from '@tensorflow/tfjs';
+import React, { useEffect, useRef, useState } from 'react';
+import * as tf from '@tensorflow/tfjs';
 import * as bodySegmentation from '@tensorflow-models/body-segmentation';
+import ThreeScene from './three/Scene';
+import SegmentationProcessor from './three/SegmentationProcessor';
 
 const Camera = () => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+    const threeCanvasRef = useRef(null);
     const [model, setModel] = useState(null);
     const [loading, setLoading] = useState(true);
     const [fps, setFps] = useState(0);
     
-    // FPS计算相关变量
+    const threeSceneRef = useRef(null);
+    const segmentationProcessorRef = useRef(null);
     const frameCountRef = useRef(0);
     const lastTimeRef = useRef(performance.now());
-    const fpsIntervalRef = useRef(1000); // 每秒更新一次FPS
-
-    // 更新FPS显示
-    const updateFPS = () => {
-        const now = performance.now();
-        const elapsed = now - lastTimeRef.current;
-
-        if (elapsed >= fpsIntervalRef.current) {
-            const currentFps = Math.round((frameCountRef.current * 1000) / elapsed);
-            setFps(currentFps);
-            frameCountRef.current = 0;
-            lastTimeRef.current = now;
-        }
-        frameCountRef.current++;
-    };
 
     // 初始化模型
     const loadModel = async () => {
         try {
             await tf.ready();
             await tf.setBackend('webgl');
-            console.log('TensorFlow.js 初始化成功');
             
             const model = await bodySegmentation.createSegmenter(
                 bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation,
@@ -41,7 +30,6 @@ const Camera = () => {
                     modelType: 'general'
                 }
             );
-            console.log('模型加载成功');
             setModel(model);
             setLoading(false);
         } catch (error) {
@@ -74,7 +62,6 @@ const Camera = () => {
                 };
             });
             
-            console.log('摄像头初始化成功');
             return true;
         } catch (error) {
             console.error('摄像头访问失败:', error);
@@ -82,24 +69,29 @@ const Camera = () => {
         }
     };
 
+    // 更新FPS显示
+    const updateFPS = () => {
+        const now = performance.now();
+        const elapsed = now - lastTimeRef.current;
+
+        if (elapsed >= 1000) {
+            setFps(Math.round((frameCountRef.current * 1000) / elapsed));
+            frameCountRef.current = 0;
+            lastTimeRef.current = now;
+        }
+        frameCountRef.current++;
+    };
+
     // 执行语义分割
     const segmentPerson = async () => {
-        if (!model || !videoRef.current || !canvasRef.current) {
-            console.log('模型或视频元素未准备好');
-            return;
-        }
+        if (!model || !videoRef.current || !canvasRef.current) return;
 
         try {
             const video = videoRef.current;
             const canvas = canvasRef.current;
             const ctx = canvas.getContext('2d');
 
-            if (video.readyState < 2) {
-                console.log('视频未准备好');
-                return;
-            }
-
-            const startTime = performance.now();
+            if (video.readyState < 2) return;
 
             const people = await model.segmentPeople(video, {
                 flipHorizontal: false,
@@ -108,14 +100,17 @@ const Camera = () => {
             });
             
             if (people.length > 0) {
-                const foregroundColor = { r: 255, g: 255, b: 255, a: 255 };
-                const backgroundColor = { r: 0, g: 0, b: 0, a: 0 };
-                const mask = await bodySegmentation.toBinaryMask(
-                    people,
-                    foregroundColor,
-                    backgroundColor
-                );
+                // 处理分割结果
+                const result = await segmentationProcessorRef.current.processSegmentation(people);
+                if (result) {
+                    const { position, scale } = result;
+                    threeSceneRef.current.updateCubePosition(position.x, position.y, scale);
+                }
 
+                // 创建遮罩
+                const mask = await segmentationProcessorRef.current.createMask(people);
+
+                // 渲染视频帧
                 const offscreenCanvas = document.createElement('canvas');
                 offscreenCanvas.width = canvas.width;
                 offscreenCanvas.height = canvas.height;
@@ -145,18 +140,11 @@ const Camera = () => {
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.putImageData(outputImage, 0, 0);
-
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.drawImage(canvas, 0, 0);
-                ctx.globalCompositeOperation = 'source-over';
             } else {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             }
 
-            // 更新FPS
             updateFPS();
-
-            // 绘制FPS
             ctx.fillStyle = 'white';
             ctx.font = '24px Arial';
             ctx.fillText(`FPS: ${fps}`, 10, 30);
@@ -179,6 +167,8 @@ const Camera = () => {
 
     useEffect(() => {
         loadModel();
+        threeSceneRef.current = new ThreeScene(threeCanvasRef.current);
+        segmentationProcessorRef.current = new SegmentationProcessor(canvasRef.current);
     }, []);
 
     useEffect(() => {
@@ -207,6 +197,17 @@ const Camera = () => {
                     ref={canvasRef}
                     width="640"
                     height="480"
+                />
+                <canvas
+                    ref={threeCanvasRef}
+                    width="640"
+                    height="480"
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        pointerEvents: 'none'
+                    }}
                 />
             </div>
             <div className="fps-display">
