@@ -19,10 +19,16 @@ class ThreeScene {
       // 创建场景
       this.scene = new THREE.Scene();
 
-      // 创建正交相机
+      // 获取容器尺寸
+      const container = this.canvas.parentElement;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      const aspect = width / height;
+
+      // 创建正交相机，根据容器尺寸调整视口
       this.camera = new THREE.OrthographicCamera(
-        -1, // left
-        1, // right
+        -aspect, // left
+        aspect, // right
         1, // top
         -1, // bottom
         0.1, // near
@@ -37,11 +43,11 @@ class ThreeScene {
         antialias: true,
         powerPreference: "high-performance",
       });
-      this.renderer.setSize(640, 480);
+      this.renderer.setSize(width, height);
       this.renderer.setClearColor(0x000000, 0);
 
       // 创建立方体
-      const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+      const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
       const material = new THREE.MeshPhongMaterial({
         color: 0x646cff,
         transparent: true,
@@ -60,6 +66,9 @@ class ThreeScene {
       const ambientLight = new THREE.AmbientLight(0x404040);
       this.scene.add(ambientLight);
 
+      // 监听窗口大小变化
+      window.addEventListener("resize", this.handleResize);
+
       this.isInitialized = true;
       this.animate();
     } catch (error) {
@@ -67,6 +76,25 @@ class ThreeScene {
       this.dispose();
     }
   }
+
+  handleResize = () => {
+    if (!this.canvas || !this.camera || !this.renderer) return;
+
+    const container = this.canvas.parentElement;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const aspect = width / height;
+
+    // 更新相机视口
+    this.camera.left = -aspect;
+    this.camera.right = aspect;
+    this.camera.top = 1;
+    this.camera.bottom = -1;
+    this.camera.updateProjectionMatrix();
+
+    // 更新渲染器尺寸
+    this.renderer.setSize(width, height);
+  };
 
   animate = () => {
     if (this.isDisposed || !this.isInitialized) return;
@@ -112,6 +140,9 @@ class ThreeScene {
   dispose() {
     this.isDisposed = true;
     this.stop();
+
+    // 移除窗口大小变化监听
+    window.removeEventListener("resize", this.handleResize);
 
     if (this.cube) {
       this.scene.remove(this.cube);
