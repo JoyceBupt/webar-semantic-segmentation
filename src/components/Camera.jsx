@@ -79,9 +79,6 @@ const Camera = () => {
         }
 
         updateFPS();
-        ctx.fillStyle = 'white';
-        ctx.font = '24px Arial';
-        ctx.fillText(`FPS: ${fps}`, 10, 30);
     };
 
     // 持续执行分割
