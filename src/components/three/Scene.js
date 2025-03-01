@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 class ThreeScene {
   constructor(canvas) {
@@ -6,10 +7,13 @@ class ThreeScene {
     this.scene = null;
     this.camera = null;
     this.renderer = null;
-    this.cube = null;
+    this.model = null;
     this.isDisposed = false;
     this.animationFrameId = null;
     this.isInitialized = false;
+    this.mixer = null;
+    this.clock = new THREE.Clock();
+    this.animations = [];
   }
 
   init() {
@@ -46,18 +50,6 @@ class ThreeScene {
       this.renderer.setSize(width, height);
       this.renderer.setClearColor(0x000000, 0);
 
-      // 创建立方体
-      const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x646cff,
-        transparent: true,
-        opacity: 0.8,
-        shininess: 100,
-      });
-      this.cube = new THREE.Mesh(geometry, material);
-      this.cube.position.z = 0;
-      this.scene.add(this.cube);
-
       // 添加光源
       const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
       directionalLight.position.set(0, 0, 5);
@@ -65,6 +57,9 @@ class ThreeScene {
 
       const ambientLight = new THREE.AmbientLight(0x404040);
       this.scene.add(ambientLight);
+
+      // 加载GLTF模型
+      this.loadModel();
 
       // 监听窗口大小变化
       window.addEventListener("resize", this.handleResize);
@@ -75,6 +70,40 @@ class ThreeScene {
       console.error("Three.js 场景初始化失败:", error);
       this.dispose();
     }
+  }
+
+  loadModel() {
+    const loader = new GLTFLoader();
+
+    loader.load(
+      "/Fox/glTF/Fox.gltf",
+      (gltf) => {
+        this.model = gltf.scene;
+
+        // 调整模型大小和位置
+        this.model.scale.set(0.005, 0.005, 0.005);
+        this.model.position.set(0, -0.5, 0);
+        this.model.rotation.y = Math.PI / 4;
+
+        this.scene.add(this.model);
+
+        // 设置动画
+        if (gltf.animations && gltf.animations.length) {
+          this.mixer = new THREE.AnimationMixer(this.model);
+          this.animations = gltf.animations;
+
+          // 播放第一个动画
+          const action = this.mixer.clipAction(this.animations[0]);
+          action.play();
+        }
+      },
+      (xhr) => {
+        console.log((xhr.loaded / xhr.total) * 100 + "% 已加载");
+      },
+      (error) => {
+        console.error("加载模型时出错:", error);
+      }
+    );
   }
 
   handleResize = () => {
@@ -99,21 +128,25 @@ class ThreeScene {
   animate = () => {
     if (this.isDisposed || !this.isInitialized) return;
 
-    if (this.cube && this.renderer && this.scene && this.camera) {
-      this.cube.rotation.x += 0.01;
-      this.cube.rotation.y += 0.01;
+    // 更新动画混合器
+    if (this.mixer) {
+      const delta = this.clock.getDelta();
+      this.mixer.update(delta);
+    }
+
+    if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
     }
 
     this.animationFrameId = requestAnimationFrame(this.animate);
   };
 
-  updateCubePosition(x, y, scale) {
-    if (!this.cube || this.isDisposed || !this.isInitialized) return;
+  updateModelPosition(x, y, scale) {
+    if (!this.model || this.isDisposed || !this.isInitialized) return;
 
-    this.cube.position.x = x;
-    this.cube.position.y = y;
-    this.cube.scale.set(scale, scale, scale);
+    this.model.position.x = x;
+    this.model.position.y = y - 0.3; // 稍微下移模型以便更好地显示
+    this.model.scale.set(scale * 0.005, scale * 0.005, scale * 0.005);
 
     // 强制渲染更新
     if (this.renderer && this.scene && this.camera) {
@@ -144,11 +177,13 @@ class ThreeScene {
     // 移除窗口大小变化监听
     window.removeEventListener("resize", this.handleResize);
 
-    if (this.cube) {
-      this.scene.remove(this.cube);
-      this.cube.geometry.dispose();
-      this.cube.material.dispose();
-      this.cube = null;
+    if (this.model) {
+      this.scene.remove(this.model);
+      this.model = null;
+    }
+
+    if (this.mixer) {
+      this.mixer = null;
     }
 
     if (this.scene) {

@@ -34,7 +34,7 @@ const Camera = () => {
             const result = await segmentationProcessorRef.current?.processSegmentation(people);
             if (result) {
                 const { position, scale } = result;
-                threeSceneRef.current?.updateCubePosition(position.x, position.y, scale);
+                threeSceneRef.current?.updateModelPosition(position.x, position.y, scale);
             }
 
             // 创建遮罩

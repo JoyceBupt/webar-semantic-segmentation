@@ -15,10 +15,11 @@ function App() {
         <Routes>
           <Route path="/person" element={<Camera />} />
           <Route path="/semantic" element={<SemanticSegmentation />} />
-          <Route path="/" element={<div className="welcome">
-            <h2>请选择演示模式</h2>
-            <p>点击上方按钮选择要体验的分割模式</p>
-          </div>} />
+          <Route path="/" element={
+            <div className="welcome">
+              <h2>请选择演示模式</h2>
+              <p>点击上方按钮选择要体验的分割模式</p>
+            </div>} />
         </Routes>
       </div>
     </Router>
