@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ThreeScene from './three/Scene';
 import SegmentationProcessor from './three/SegmentationProcessor';
 import { useBodySegmentation } from '../hooks/useBodySegmentation';
@@ -12,6 +12,9 @@ const Camera = () => {
     
     const threeSceneRef = useRef(null);
     const segmentationProcessorRef = useRef(null);
+    
+    // 添加交互控制状态
+    const [interactionEnabled, setInteractionEnabled] = useState(false);
     
     const { model, loading, loadModel, segmentPeople } = useBodySegmentation();
     const { setupCamera } = useCamera(videoRef);
@@ -91,6 +94,21 @@ const Camera = () => {
             processFrame();
         }
     };
+    
+    // 切换交互控制
+    const toggleInteraction = () => {
+        if (interactionEnabled) {
+            threeSceneRef.current?.disableInteraction();
+        } else {
+            threeSceneRef.current?.enableInteraction();
+        }
+        setInteractionEnabled(!interactionEnabled);
+    };
+    
+    // 重置模型变换
+    const resetModelTransform = () => {
+        threeSceneRef.current?.resetModelTransform();
+    };
 
     useEffect(() => {
         loadModel();
@@ -155,12 +173,37 @@ const Camera = () => {
                         position: 'absolute',
                         top: 0,
                         left: 0,
-                        pointerEvents: 'none'
+                        pointerEvents: interactionEnabled ? 'auto' : 'none'
                     }}
                 />
             </div>
             <div className="fps-display">
                 FPS: {fps}
+            </div>
+            
+            {/* 添加交互控制按钮 */}
+            <div className="controls">
+                <button 
+                    className={`interaction-toggle ${interactionEnabled ? 'active' : ''}`}
+                    onClick={toggleInteraction}
+                >
+                    {interactionEnabled ? '禁用交互' : '启用交互'}
+                </button>
+                {interactionEnabled && (
+                    <button 
+                        className="reset-model"
+                        onClick={resetModelTransform}
+                    >
+                        重置模型
+                    </button>
+                )}
+                <div className="interaction-tips" style={{ display: interactionEnabled ? 'block' : 'none' }}>
+                    <p>提示：</p>
+                    <ul>
+                        <li>单指滑动：旋转模型</li>
+                        <li>双指捏合：缩放模型</li>
+                    </ul>
+                </div>
             </div>
         </div>
     );

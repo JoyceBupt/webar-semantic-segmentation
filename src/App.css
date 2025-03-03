@@ -383,3 +383,100 @@ canvas {
     font-size: 1em;
   }
 }
+
+/* 交互控制样式 */
+.controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 10;
+  width: 80%;
+  max-width: 400px;
+}
+
+.interaction-toggle, .reset-model {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 200px;
+}
+
+.interaction-toggle {
+  background: linear-gradient(135deg, #646cff 0%, #4a50c4 100%);
+  color: white;
+}
+
+.interaction-toggle.active {
+  background: linear-gradient(135deg, #ff6464 0%, #c44a4a 100%);
+}
+
+.reset-model {
+  background: linear-gradient(135deg, #64a0ff 0%, #4a7ac4 100%);
+  color: white;
+}
+
+.interaction-toggle:hover, .reset-model:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+}
+
+.interaction-toggle:active, .reset-model:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.interaction-tips {
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-top: 10px;
+  color: white;
+  font-size: 14px;
+  width: 100%;
+  max-width: 300px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.interaction-tips p {
+  margin: 0 0 5px 0;
+  font-weight: 600;
+  color: #646cff;
+}
+
+.interaction-tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.interaction-tips li {
+  margin-bottom: 5px;
+}
+
+@media (max-width: 768px) {
+  .controls {
+    bottom: 10px;
+    width: 90%;
+  }
+  
+  .interaction-toggle, .reset-model {
+    font-size: 14px;
+    padding: 8px 16px;
+  }
+  
+  .interaction-tips {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}

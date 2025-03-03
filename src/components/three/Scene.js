@@ -14,6 +14,16 @@ class ThreeScene {
     this.mixer = null;
     this.clock = new THREE.Clock();
     this.animations = [];
+
+    // 交互控制相关属性
+    this.isDragging = false;
+    this.previousTouch = null;
+    this.initialScale = 0.005;
+    this.currentScale = this.initialScale;
+    this.initialRotationY = Math.PI / 4;
+    this.currentRotationY = this.initialRotationY;
+    this.pinchStartDistance = 0;
+    this.isInteractionEnabled = false;
   }
 
   init() {
@@ -148,6 +158,148 @@ class ThreeScene {
     this.model.position.y = y - 0.3; // 稍微下移模型以便更好地显示
     this.model.scale.set(scale * 0.005, scale * 0.005, scale * 0.005);
 
+    // 保存当前缩放值
+    this.currentScale = scale * 0.005;
+
+    // 强制渲染更新
+    if (this.renderer && this.scene && this.camera) {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  // 启用交互控制
+  enableInteraction() {
+    if (
+      !this.canvas ||
+      this.isDisposed ||
+      !this.isInitialized ||
+      this.isInteractionEnabled
+    )
+      return;
+
+    this.isInteractionEnabled = true;
+
+    // 添加触摸事件监听器
+    this.canvas.addEventListener("touchstart", this.handleTouchStart);
+    this.canvas.addEventListener("touchmove", this.handleTouchMove);
+    this.canvas.addEventListener("touchend", this.handleTouchEnd);
+
+    // 修改canvas样式，使其可以接收事件
+    this.canvas.style.pointerEvents = "auto";
+
+    console.log("模型交互控制已启用");
+  }
+
+  // 禁用交互控制
+  disableInteraction() {
+    if (!this.canvas || !this.isInteractionEnabled) return;
+
+    this.isInteractionEnabled = false;
+
+    // 移除触摸事件监听器
+    this.canvas.removeEventListener("touchstart", this.handleTouchStart);
+    this.canvas.removeEventListener("touchmove", this.handleTouchMove);
+    this.canvas.removeEventListener("touchend", this.handleTouchEnd);
+
+    // 恢复canvas样式
+    this.canvas.style.pointerEvents = "none";
+
+    console.log("模型交互控制已禁用");
+  }
+
+  // 处理触摸开始事件
+  handleTouchStart = (event) => {
+    event.preventDefault();
+
+    if (!this.model) return;
+
+    if (event.touches.length === 1) {
+      // 单指触摸 - 准备旋转
+      this.isDragging = true;
+      this.previousTouch = {
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY,
+      };
+    } else if (event.touches.length === 2) {
+      // 双指触摸 - 准备缩放
+      this.isDragging = false;
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      this.pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
+    }
+  };
+
+  // 处理触摸移动事件
+  handleTouchMove = (event) => {
+    event.preventDefault();
+
+    if (!this.model) return;
+
+    if (this.isDragging && event.touches.length === 1) {
+      // 单指移动 - 旋转模型
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - this.previousTouch.x;
+
+      // 根据水平移动旋转模型
+      this.currentRotationY += deltaX * 0.01;
+      this.model.rotation.y = this.currentRotationY;
+
+      this.previousTouch = {
+        x: touch.clientX,
+        y: touch.clientY,
+      };
+
+      // 强制渲染更新
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.render(this.scene, this.camera);
+      }
+    } else if (event.touches.length === 2) {
+      // 双指移动 - 缩放模型
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // 计算缩放比例
+      const scale = distance / this.pinchStartDistance;
+      const newScale = this.currentScale * scale;
+
+      // 限制缩放范围
+      const limitedScale = Math.max(0.001, Math.min(0.02, newScale));
+
+      // 应用缩放
+      this.model.scale.set(limitedScale, limitedScale, limitedScale);
+
+      // 更新起始距离
+      this.pinchStartDistance = distance;
+      this.currentScale = limitedScale;
+
+      // 强制渲染更新
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+  };
+
+  // 处理触摸结束事件
+  handleTouchEnd = () => {
+    this.isDragging = false;
+    this.previousTouch = null;
+  };
+
+  // 重置模型位置和旋转
+  resetModelTransform() {
+    if (!this.model) return;
+
+    this.currentScale = this.initialScale;
+    this.currentRotationY = this.initialRotationY;
+
+    this.model.scale.set(
+      this.currentScale,
+      this.currentScale,
+      this.currentScale
+    );
+    this.model.rotation.y = this.currentRotationY;
+
     // 强制渲染更新
     if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
@@ -176,6 +328,13 @@ class ThreeScene {
 
     // 移除窗口大小变化监听
     window.removeEventListener("resize", this.handleResize);
+
+    // 移除交互事件监听
+    if (this.canvas && this.isInteractionEnabled) {
+      this.canvas.removeEventListener("touchstart", this.handleTouchStart);
+      this.canvas.removeEventListener("touchmove", this.handleTouchMove);
+      this.canvas.removeEventListener("touchend", this.handleTouchEnd);
+    }
 
     if (this.model) {
       this.scene.remove(this.model);
