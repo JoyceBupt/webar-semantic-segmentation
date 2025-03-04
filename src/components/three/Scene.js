@@ -24,6 +24,13 @@ class ThreeScene {
     this.currentRotationY = this.initialRotationY;
     this.pinchStartDistance = 0;
     this.isInteractionEnabled = false;
+
+    // 添加模型位置相关属性，用于平滑过渡
+    this.targetPosition = { x: 0, y: 0 };
+    this.currentPosition = { x: 0, y: 0 };
+    this.targetScale = this.initialScale;
+    this.positionLerpFactor = 0.3; // 增加位置插值因子，使跟踪更迅速
+    this.scaleLerpFactor = 0.2; // 增加缩放插值因子
   }
 
   init() {
@@ -94,6 +101,14 @@ class ThreeScene {
         this.model.scale.set(0.005, 0.005, 0.005);
         this.model.position.set(0, -0.5, 0);
         this.model.rotation.y = Math.PI / 4;
+
+        // 初始化当前位置和缩放
+        this.currentPosition.x = this.model.position.x;
+        this.currentPosition.y = this.model.position.y;
+        this.currentScale = 0.005;
+        this.targetPosition.x = this.currentPosition.x;
+        this.targetPosition.y = this.currentPosition.y;
+        this.targetScale = this.currentScale;
 
         this.scene.add(this.model);
 
@@ -170,6 +185,41 @@ class ThreeScene {
       this.mixer.update(delta);
     }
 
+    // 平滑过渡到目标位置和缩放
+    if (this.model) {
+      // 计算自上一帧以来的时间增量，用于帧率独立的平滑插值
+      const deltaTime = Math.min(0.1, this.clock.getDelta());
+      const smoothFactor = 1.0 - Math.pow(0.001, deltaTime);
+
+      // 使用帧率独立的平滑因子
+      const positionFactor = Math.min(
+        1.0,
+        this.positionLerpFactor * (1 + smoothFactor * 10)
+      );
+      const scaleFactor = Math.min(
+        1.0,
+        this.scaleLerpFactor * (1 + smoothFactor * 5)
+      );
+
+      // 位置平滑插值
+      this.currentPosition.x +=
+        (this.targetPosition.x - this.currentPosition.x) * positionFactor;
+      this.currentPosition.y +=
+        (this.targetPosition.y - this.currentPosition.y) * positionFactor;
+
+      // 缩放平滑插值
+      this.currentScale += (this.targetScale - this.currentScale) * scaleFactor;
+
+      // 应用插值后的位置和缩放
+      this.model.position.x = this.currentPosition.x;
+      this.model.position.y = this.currentPosition.y;
+      this.model.scale.set(
+        this.currentScale,
+        this.currentScale,
+        this.currentScale
+      );
+    }
+
     if (this.renderer && this.scene && this.camera) {
       this.renderer.render(this.scene, this.camera);
     }
@@ -180,16 +230,25 @@ class ThreeScene {
   updateModelPosition(x, y, scale) {
     if (!this.model || this.isDisposed || !this.isInitialized) return;
 
-    this.model.position.x = x;
-    this.model.position.y = y - 0.3; // 稍微下移模型以便更好地显示
-    this.model.scale.set(scale * 0.005, scale * 0.005, scale * 0.005);
+    // 更新目标位置和缩放，而不是直接设置
+    this.targetPosition.x = x;
+    // 调整Y轴偏移，使模型更好地对齐人物
+    this.targetPosition.y = y - 0.2; // 减小Y轴偏移量，使模型更接近人物顶部
+    // 缩放因子微调
+    this.targetScale = scale * 0.006; // 略微增加缩放比例，让模型更贴合人物
 
-    // 保存当前缩放值
-    this.currentScale = scale * 0.005;
+    // 当检测到大幅度位置变化时，直接更新当前位置，避免跟踪滞后
+    const positionDeltaX = Math.abs(
+      this.targetPosition.x - this.currentPosition.x
+    );
+    const positionDeltaY = Math.abs(
+      this.targetPosition.y - this.currentPosition.y
+    );
 
-    // 强制渲染更新
-    if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
+    // 如果位置变化超过阈值，直接更新当前位置以避免滞后
+    if (positionDeltaX > 0.3 || positionDeltaY > 0.3) {
+      this.currentPosition.x = this.targetPosition.x;
+      this.currentPosition.y = this.targetPosition.y;
     }
   }
 
@@ -252,6 +311,8 @@ class ThreeScene {
       const dx = event.touches[0].clientX - event.touches[1].clientX;
       const dy = event.touches[0].clientY - event.touches[1].clientY;
       this.pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
+      // 存储缩放操作开始时的当前缩放值
+      this.pinchStartScale = this.currentScale;
     }
   };
 
@@ -274,35 +335,23 @@ class ThreeScene {
         x: touch.clientX,
         y: touch.clientY,
       };
-
-      // 强制渲染更新
-      if (this.renderer && this.scene && this.camera) {
-        this.renderer.render(this.scene, this.camera);
-      }
     } else if (event.touches.length === 2) {
       // 双指移动 - 缩放模型
       const dx = event.touches[0].clientX - event.touches[1].clientX;
       const dy = event.touches[0].clientY - event.touches[1].clientY;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // 计算缩放比例
-      const scale = distance / this.pinchStartDistance;
-      const newScale = this.currentScale * scale;
+      // 计算相对于初始双指距离的缩放比例
+      const scaleFactor = distance / this.pinchStartDistance;
+
+      // 基于初始缩放值计算新的缩放值
+      const newScale = this.pinchStartScale * scaleFactor;
 
       // 限制缩放范围
       const limitedScale = Math.max(0.001, Math.min(0.02, newScale));
 
-      // 应用缩放
-      this.model.scale.set(limitedScale, limitedScale, limitedScale);
-
-      // 更新起始距离
-      this.pinchStartDistance = distance;
-      this.currentScale = limitedScale;
-
-      // 强制渲染更新
-      if (this.renderer && this.scene && this.camera) {
-        this.renderer.render(this.scene, this.camera);
-      }
+      // 更新目标缩放
+      this.targetScale = limitedScale;
     }
   };
 
@@ -316,20 +365,28 @@ class ThreeScene {
   resetModelTransform() {
     if (!this.model) return;
 
-    this.currentScale = this.initialScale;
+    // 设置目标值，而不是直接修改
+    this.targetScale = this.initialScale;
     this.currentRotationY = this.initialRotationY;
+    this.targetPosition.x = 0;
+    this.targetPosition.y = -0.4; // 调整为与新的Y轴偏移一致
 
+    // 直接重置当前位置，确保立即响应
+    this.currentPosition.x = this.targetPosition.x;
+    this.currentPosition.y = this.targetPosition.y;
+    this.currentScale = this.targetScale;
+
+    // 直接设置旋转，因为旋转没有使用平滑插值
+    this.model.rotation.y = this.currentRotationY;
+
+    // 立即更新模型位置和缩放
+    this.model.position.x = this.currentPosition.x;
+    this.model.position.y = this.currentPosition.y;
     this.model.scale.set(
       this.currentScale,
       this.currentScale,
       this.currentScale
     );
-    this.model.rotation.y = this.currentRotationY;
-
-    // 强制渲染更新
-    if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
-    }
   }
 
   // 停止渲染
