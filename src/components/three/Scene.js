@@ -133,7 +133,33 @@ class ThreeScene {
 
     // 更新渲染器尺寸
     this.renderer.setSize(width, height);
+
+    // 强制渲染更新
+    if (this.renderer && this.scene && this.camera) {
+      this.renderer.render(this.scene, this.camera);
+    }
   };
+
+  updateSize(width, height) {
+    if (!this.canvas || !this.camera || !this.renderer) return;
+
+    const aspect = width / height;
+
+    // 更新相机视口
+    this.camera.left = -aspect;
+    this.camera.right = aspect;
+    this.camera.top = 1;
+    this.camera.bottom = -1;
+    this.camera.updateProjectionMatrix();
+
+    // 更新渲染器尺寸
+    this.renderer.setSize(width, height);
+
+    // 强制渲染更新
+    if (this.renderer && this.scene && this.camera) {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
 
   animate = () => {
     if (this.isDisposed || !this.isInitialized) return;

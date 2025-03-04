@@ -11,7 +11,6 @@ const SemanticSegmentation = () => {
     const canvasRef = useRef(null);
     const [model, setModel] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
     const [selectedClass, setSelectedClass] = useState(null);
     const [detectedClasses, setDetectedClasses] = useState([]);
     
@@ -19,15 +18,24 @@ const SemanticSegmentation = () => {
     const { setupCamera } = useCamera(videoRef);
     const { renderSegmentation } = useSegmentationRenderer(canvasRef);
 
-    // 监听屏幕方向变化
+    // 调整canvas尺寸以匹配视频比例
+    const adjustCanvasSize = () => {
+        if (videoRef.current && canvasRef.current) {
+            const videoWidth = videoRef.current.videoWidth;
+            const videoHeight = videoRef.current.videoHeight;
+            
+            if (videoWidth && videoHeight) {
+                canvasRef.current.width = videoWidth;
+                canvasRef.current.height = videoHeight;
+            }
+        }
+    };
+
+    // 处理窗口大小变化
     useEffect(() => {
-        const handleOrientationChange = () => {
-            setIsPortrait(window.innerHeight > window.innerWidth);
-        };
-        
-        window.addEventListener('resize', handleOrientationChange);
+        window.addEventListener('resize', adjustCanvasSize);
         return () => {
-            window.removeEventListener('resize', handleOrientationChange);
+            window.removeEventListener('resize', adjustCanvasSize);
         };
     }, []);
 
@@ -172,18 +180,20 @@ const SemanticSegmentation = () => {
         }
     }, [model]);
 
+    // 视频加载后调整canvas尺寸
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.addEventListener('loadedmetadata', adjustCanvasSize);
+            return () => {
+                if (videoRef.current) {
+                    videoRef.current.removeEventListener('loadedmetadata', adjustCanvasSize);
+                }
+            };
+        }
+    }, [videoRef.current]);
+
     return (
         <div className="segmentation-container">
-            {isPortrait && (
-                <div className="orientation-warning">
-                    <div className="orientation-content">
-                        <div className="orientation-icon">📱</div>
-                        <p>建议横屏使用<br/>以获得更好的体验</p>
-                        <div className="rotate-icon">🔄</div>
-                    </div>
-                </div>
-            )}
-            
             {loading && (
                 <div className="loading">
                     <p>语义分割模型加载中</p>

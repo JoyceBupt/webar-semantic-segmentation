@@ -17,8 +17,6 @@ const Camera = () => {
     const [interactionEnabled, setInteractionEnabled] = useState(false);
     // 添加提示状态
     const [showTips, setShowTips] = useState(true);
-    // 添加方向状态检测
-    const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
     
     const { model, loading, loadModel, segmentPeople } = useBodySegmentation();
     const { setupCamera } = useCamera(videoRef);
@@ -119,17 +117,25 @@ const Camera = () => {
         setShowTips(false);
     };
 
-    // 监听屏幕方向变化
-    useEffect(() => {
-        const handleOrientationChange = () => {
-            setIsPortrait(window.innerHeight > window.innerWidth);
-        };
-        
-        window.addEventListener('resize', handleOrientationChange);
-        return () => {
-            window.removeEventListener('resize', handleOrientationChange);
-        };
-    }, []);
+    // 调整canvas尺寸以匹配视频比例
+    const adjustCanvasSize = () => {
+        if (videoRef.current && canvasRef.current && threeCanvasRef.current) {
+            const videoWidth = videoRef.current.videoWidth;
+            const videoHeight = videoRef.current.videoHeight;
+            
+            if (videoWidth && videoHeight) {
+                canvasRef.current.width = videoWidth;
+                canvasRef.current.height = videoHeight;
+                threeCanvasRef.current.width = videoWidth;
+                threeCanvasRef.current.height = videoHeight;
+                
+                // 如果有Three.js场景，通知其更新尺寸
+                if (threeSceneRef.current) {
+                    threeSceneRef.current.updateSize(videoWidth, videoHeight);
+                }
+            }
+        }
+    };
 
     useEffect(() => {
         loadModel();
@@ -147,6 +153,9 @@ const Camera = () => {
         
         segmentationProcessorRef.current = new SegmentationProcessor(canvasRef.current);
 
+        // 处理窗口大小变化
+        window.addEventListener('resize', adjustCanvasSize);
+
         // 清理函数
         return () => {
             if (threeSceneRef.current) {
@@ -156,6 +165,7 @@ const Camera = () => {
                 const tracks = videoRef.current.srcObject.getTracks();
                 tracks.forEach(track => track.stop());
             }
+            window.removeEventListener('resize', adjustCanvasSize);
         };
     }, []);
 
@@ -165,18 +175,20 @@ const Camera = () => {
         }
     }, [model]);
 
+    // 视频加载后调整canvas尺寸
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.addEventListener('loadedmetadata', adjustCanvasSize);
+            return () => {
+                if (videoRef.current) {
+                    videoRef.current.removeEventListener('loadedmetadata', adjustCanvasSize);
+                }
+            };
+        }
+    }, [videoRef.current]);
+
     return (
         <div className="camera-container">
-            {isPortrait && (
-                <div className="orientation-warning">
-                    <div className="orientation-content">
-                        <div className="orientation-icon">📱</div>
-                        <p>建议横屏使用<br/>以获得更好的体验</p>
-                        <div className="rotate-icon">🔄</div>
-                    </div>
-                </div>
-            )}
-            
             {loading && (
                 <div className="loading">
                     <p>模型加载中</p>
