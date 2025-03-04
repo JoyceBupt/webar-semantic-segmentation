@@ -923,3 +923,327 @@ footer p {
     padding: 0.5rem;
   }
 }
+
+/* 重新设计AR控制面板 - 悬浮图标设计 */
+.ar-enhancements {
+  position: absolute;
+  top: 20px;
+  right: 15px;
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+  transition: all 0.3s ease;
+  background: none;
+  border: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+/* 下拉菜单容器 */
+.model-type-selector,
+.model-action-selector,
+.effects-toggle {
+  pointer-events: auto;
+  background-color: rgba(0, 0, 0, 0.65);
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 5px;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* 鼠标悬停时展开菜单 */
+.model-type-selector:hover,
+.model-action-selector:hover {
+  width: auto;
+  height: auto;
+  min-width: 160px;
+}
+
+.model-type-selector h4,
+.model-action-selector h4 {
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 8px 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  display: none;
+}
+
+.model-type-selector:hover h4,
+.model-action-selector:hover h4 {
+  display: block;
+}
+
+/* 类型选择图标 */
+.model-type-selector::before {
+  content: "🦊";
+  font-size: 1.5rem;
+  color: white;
+}
+
+.model-type-selector:hover::before {
+  display: none;
+}
+
+/* 动作选择图标 */
+.model-action-selector::before {
+  content: "🏃";
+  font-size: 1.5rem;
+  color: white;
+}
+
+.model-action-selector:hover::before {
+  display: none;
+}
+
+/* 特效切换按钮 */
+.effects-toggle button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.effects-toggle button::before {
+  content: "✨";
+}
+
+.effects-toggle button:hover {
+  transform: scale(1.2);
+}
+
+.effects-toggle button.active {
+  color: #4a86e8;
+}
+
+.model-type-options,
+.model-options {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.model-type-selector:hover .model-type-options,
+.model-action-selector:hover .model-options {
+  display: flex;
+}
+
+.model-type-option,
+.model-option {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  border-radius: 15px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.model-type-option:hover,
+.model-option:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.model-type-option.active,
+.model-option.active {
+  background-color: #4a86e8;
+  box-shadow: 0 2px 8px rgba(74, 134, 232, 0.4);
+}
+
+/* 控制按钮容器样式调整 */
+.controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 15px;
+  z-index: 110;
+}
+
+.interaction-toggle, 
+.reset-model {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.65);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.interaction-toggle::before {
+  content: "👆";
+  font-size: 1.3rem;
+}
+
+.interaction-toggle.active::before {
+  content: "✋";
+}
+
+.reset-model::before {
+  content: "🔄";
+  font-size: 1.3rem;
+}
+
+.interaction-toggle:hover, 
+.reset-model:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* 调整操作提示位置 */
+.interaction-tips {
+  position: absolute;
+  top: 20px;
+  left: 15px;
+  background-color: rgba(0, 0, 0, 0.65);
+  color: white;
+  border-radius: 10px;
+  padding: 10px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  max-width: 200px;
+  transition: opacity 0.3s ease;
+}
+
+.tips-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tips-header p {
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.close-tips {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  padding: 0 0 0 10px;
+  line-height: 1;
+}
+
+.close-tips:hover {
+  opacity: 1;
+}
+
+.interaction-tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.interaction-tips li {
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* 优化移动设备上的布局 */
+@media (max-width: 768px) {
+  .ar-enhancements {
+    top: 15px;
+    right: 15px;
+    gap: 8px;
+  }
+  
+  .model-type-selector,
+  .model-action-selector,
+  .effects-toggle {
+    width: 38px;
+    height: 38px;
+  }
+  
+  .model-type-selector:hover,
+  .model-action-selector:hover {
+    min-width: 140px;
+  }
+  
+  .model-type-option,
+  .model-option {
+    padding: 5px 8px;
+    font-size: 0.7rem;
+  }
+  
+  .interaction-tips {
+    top: 15px;
+    left: 15px;
+    max-width: 180px;
+    padding: 8px;
+  }
+  
+  .interaction-tips li {
+    font-size: 0.75rem;
+    margin-bottom: 5px;
+  }
+}
+
+/* 横屏模式优化 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .ar-enhancements {
+    top: 10px;
+    right: 10px;
+    gap: 6px;
+  }
+  
+  .controls {
+    bottom: 10px;
+  }
+  
+  .interaction-toggle, 
+  .reset-model {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .interaction-tips {
+    top: 10px;
+    left: 10px;
+    max-width: 160px;
+    padding: 6px 8px;
+  }
+  
+  .interaction-tips li {
+    font-size: 0.7rem;
+    margin-bottom: 4px;
+  }
+}

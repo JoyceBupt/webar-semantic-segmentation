@@ -17,6 +17,12 @@ const Camera = () => {
     const [interactionEnabled, setInteractionEnabled] = useState(false);
     // 添加提示状态
     const [showTips, setShowTips] = useState(true);
+    // 添加模型状态
+    const [currentModelIndex, setCurrentModelIndex] = useState(0);
+    const [animationIndex, setAnimationIndex] = useState(0);
+    const [modelOptions, setModelOptions] = useState([]);
+    const [animationOptions, setAnimationOptions] = useState([]);
+    const [showEffects, setShowEffects] = useState(true);
     
     const { model, loading, loadModel, segmentPeople } = useBodySegmentation();
     const { setupCamera } = useCamera(videoRef);
@@ -137,6 +143,92 @@ const Camera = () => {
         }
     };
 
+    // 切换模型
+    const handleModelChange = (index) => {
+        if (threeSceneRef.current) {
+            threeSceneRef.current.switchToModel(index);
+            setCurrentModelIndex(index);
+            // 重置动画索引，因为新模型可能有不同的动画集
+            setAnimationIndex(0);
+            // 获取新模型的动画选项
+            if (threeSceneRef.current.animations) {
+                updateAnimationOptions();
+            }
+        }
+    };
+    
+    // 切换动画
+    const handleAnimationChange = (index) => {
+        if (threeSceneRef.current) {
+            threeSceneRef.current.playAnimation(index);
+            setAnimationIndex(index);
+        }
+    };
+    
+    // 更新动画选项列表
+    const updateAnimationOptions = () => {
+        if (threeSceneRef.current && threeSceneRef.current.animations) {
+            const animations = threeSceneRef.current.animations.map((anim, index) => ({
+                name: anim.name || `动画 ${index + 1}`,
+                index
+            }));
+            setAnimationOptions(animations);
+        }
+    };
+    
+    // 切换粒子效果
+    const toggleEffects = () => {
+        setShowEffects(!showEffects);
+        if (threeSceneRef.current) {
+            if (!showEffects) {
+                threeSceneRef.current.createParticleEffect();
+            } else {
+                threeSceneRef.current.removeParticles();
+            }
+        }
+    };
+
+    // 获取模型类型列表（去重）
+    const getModelTypes = () => {
+        const types = {};
+        if (!modelOptions || modelOptions.length === 0) return [];
+        
+        modelOptions.forEach(model => {
+            // 获取名称中的模型类型（如"狐狸"或"小鸟"）
+            const typeName = model.name.split('(')[0];
+            if (!types[typeName]) {
+                types[typeName] = true;
+            }
+        });
+        
+        return Object.keys(types);
+    };
+    
+    // 按模型类型筛选模型选项
+    const getModelsByType = (type) => {
+        if (!modelOptions || modelOptions.length === 0) return [];
+        return modelOptions.filter(model => model.name.startsWith(type));
+    };
+    
+    // 获取当前选中模型的类型
+    const getCurrentModelType = () => {
+        if (!modelOptions || currentModelIndex >= modelOptions.length) return "";
+        const currentModel = modelOptions[currentModelIndex];
+        return currentModel.name.split('(')[0];
+    };
+    
+    // 切换模型类型
+    const handleModelTypeChange = (type) => {
+        // 获取该类型的第一个模型的索引
+        const modelsOfType = getModelsByType(type);
+        if (modelsOfType.length > 0) {
+            const index = modelOptions.findIndex(model => model.name === modelsOfType[0].name);
+            if (index !== -1) {
+                handleModelChange(index);
+            }
+        }
+    };
+
     useEffect(() => {
         loadModel();
         threeSceneRef.current = new ThreeScene(threeCanvasRef.current);
@@ -145,6 +237,8 @@ const Camera = () => {
         const initThreeScene = () => {
             if (threeCanvasRef.current) {
                 threeSceneRef.current.init();
+                // 获取可用模型选项
+                setModelOptions(threeSceneRef.current.modelOptions);
             }
         };
 
@@ -186,6 +280,13 @@ const Camera = () => {
             };
         }
     }, [videoRef.current]);
+
+    // 模型加载完成后获取动画选项
+    useEffect(() => {
+        if (threeSceneRef.current && threeSceneRef.current.animations) {
+            updateAnimationOptions();
+        }
+    }, [currentModelIndex]);
 
     return (
         <div className="camera-container">
@@ -231,7 +332,6 @@ const Camera = () => {
                     className={`interaction-toggle ${interactionEnabled ? 'active' : ''}`}
                     onClick={toggleInteraction}
                 >
-                    {interactionEnabled ? '禁用交互' : '启用交互'}
                 </button>
                 
                 {interactionEnabled && (
@@ -239,23 +339,67 @@ const Camera = () => {
                         className="reset-model"
                         onClick={resetModelTransform}
                     >
-                        重置模型
                     </button>
                 )}
+            </div>
+            
+            <div className="ar-enhancements">
+                {/* 模型类型选择 */}
+                <div className="model-type-selector">
+                    <h4>选择模型</h4>
+                    <div className="model-type-options">
+                        {getModelTypes().map((type, index) => (
+                            <button
+                                key={index}
+                                className={`model-type-option ${getCurrentModelType() === type ? 'active' : ''}`}
+                                onClick={() => handleModelTypeChange(type)}
+                            >
+                                {type}
+                            </button>
+                        ))}
+                    </div>
+                </div>
                 
-                {interactionEnabled && showTips && (
-                    <div className="interaction-tips">
-                        <div className="tips-header">
-                            <p>操作提示：</p>
-                            <button className="close-tips" onClick={closeTips}>×</button>
+                {/* 当前模型的动作选择 */}
+                {getCurrentModelType() === "狐狸" && (
+                    <div className="model-action-selector">
+                        <h4>动作</h4>
+                        <div className="model-options">
+                            {getModelsByType("狐狸").map((model, idx) => (
+                                <button
+                                    key={idx}
+                                    className={`model-option ${modelOptions.indexOf(model) === currentModelIndex ? 'active' : ''}`}
+                                    onClick={() => handleModelChange(modelOptions.indexOf(model))}
+                                >
+                                    {model.name.split('(')[1].replace(')', '')}
+                                </button>
+                            ))}
                         </div>
-                        <ul>
-                            <li>单指滑动：旋转模型</li>
-                            <li>双指捏合：缩放模型</li>
-                        </ul>
                     </div>
                 )}
+                
+                <div className="effects-toggle">
+                    <button
+                        className={`effect-button ${showEffects ? 'active' : ''}`}
+                        onClick={toggleEffects}
+                    >
+                    </button>
+                </div>
             </div>
+            
+            {interactionEnabled && showTips && (
+                <div className="interaction-tips">
+                    <div className="tips-header">
+                        <p>操作提示：</p>
+                        <button className="close-tips" onClick={closeTips}>×</button>
+                    </div>
+                    <ul>
+                        <li>单指滑动：旋转模型</li>
+                        <li>双指捏合：缩放模型</li>
+                        <li>可选择不同动作和特效效果</li>
+                    </ul>
+                </div>
+            )}
         </div>
     );
 };
