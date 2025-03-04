@@ -15,6 +15,10 @@ const Camera = () => {
     
     // 添加交互控制状态
     const [interactionEnabled, setInteractionEnabled] = useState(false);
+    // 添加提示状态
+    const [showTips, setShowTips] = useState(true);
+    // 添加方向状态检测
+    const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
     
     const { model, loading, loadModel, segmentPeople } = useBodySegmentation();
     const { setupCamera } = useCamera(videoRef);
@@ -109,6 +113,23 @@ const Camera = () => {
     const resetModelTransform = () => {
         threeSceneRef.current?.resetModelTransform();
     };
+    
+    // 关闭提示
+    const closeTips = () => {
+        setShowTips(false);
+    };
+
+    // 监听屏幕方向变化
+    useEffect(() => {
+        const handleOrientationChange = () => {
+            setIsPortrait(window.innerHeight > window.innerWidth);
+        };
+        
+        window.addEventListener('resize', handleOrientationChange);
+        return () => {
+            window.removeEventListener('resize', handleOrientationChange);
+        };
+    }, []);
 
     useEffect(() => {
         loadModel();
@@ -146,11 +167,22 @@ const Camera = () => {
 
     return (
         <div className="camera-container">
-            {loading && (
-                <div className="loading">
-                    <p>模型加载中...</p>
+            {isPortrait && (
+                <div className="orientation-warning">
+                    <div className="orientation-content">
+                        <div className="orientation-icon">📱</div>
+                        <p>建议横屏使用<br/>以获得更好的体验</p>
+                        <div className="rotate-icon">🔄</div>
+                    </div>
                 </div>
             )}
+            
+            {loading && (
+                <div className="loading">
+                    <p>模型加载中</p>
+                </div>
+            )}
+            
             <div className="video-container">
                 <video
                     ref={videoRef}
@@ -177,11 +209,11 @@ const Camera = () => {
                     }}
                 />
             </div>
+            
             <div className="fps-display">
                 FPS: {fps}
             </div>
             
-            {/* 添加交互控制按钮 */}
             <div className="controls">
                 <button 
                     className={`interaction-toggle ${interactionEnabled ? 'active' : ''}`}
@@ -189,6 +221,7 @@ const Camera = () => {
                 >
                     {interactionEnabled ? '禁用交互' : '启用交互'}
                 </button>
+                
                 {interactionEnabled && (
                     <button 
                         className="reset-model"
@@ -197,13 +230,19 @@ const Camera = () => {
                         重置模型
                     </button>
                 )}
-                <div className="interaction-tips" style={{ display: interactionEnabled ? 'block' : 'none' }}>
-                    <p>提示：</p>
-                    <ul>
-                        <li>单指滑动：旋转模型</li>
-                        <li>双指捏合：缩放模型</li>
-                    </ul>
-                </div>
+                
+                {interactionEnabled && showTips && (
+                    <div className="interaction-tips">
+                        <div className="tips-header">
+                            <p>操作提示：</p>
+                            <button className="close-tips" onClick={closeTips}>×</button>
+                        </div>
+                        <ul>
+                            <li>单指滑动：旋转模型</li>
+                            <li>双指捏合：缩放模型</li>
+                        </ul>
+                    </div>
+                )}
             </div>
         </div>
     );
