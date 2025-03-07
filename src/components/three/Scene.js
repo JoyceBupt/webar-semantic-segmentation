@@ -76,7 +76,7 @@ class ThreeScene {
       {
         name: "小鸟",
         path: "/Bird.glb",
-        scale: 0.003,
+        scale: 0.0002,
         yOffset: -0.3,
         defaultAnimation: 0,
         particleEffect: {

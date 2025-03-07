@@ -27,7 +27,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
+  background:
     radial-gradient(circle at 20% 20%, rgba(123, 131, 255, 0.15) 0%, transparent 50%),
     radial-gradient(circle at 80% 80%, rgba(123, 131, 255, 0.15) 0%, transparent 50%);
   pointer-events: none;
@@ -107,12 +107,10 @@ h3 {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(123, 131, 255, 0.3),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(123, 131, 255, 0.3),
+      transparent);
   transition: 0.5s;
 }
 
@@ -236,9 +234,19 @@ canvas {
 }
 
 @keyframes loading {
-  0%, 100% { content: '.'; }
-  33% { content: '..'; }
-  66% { content: '...'; }
+
+  0%,
+  100% {
+    content: '.';
+  }
+
+  33% {
+    content: '..';
+  }
+
+  66% {
+    content: '...';
+  }
 }
 
 .fps-display {
@@ -274,10 +282,12 @@ canvas {
     transform: scale(0.95);
     opacity: 0.8;
   }
+
   50% {
     transform: scale(1.05);
     opacity: 1;
   }
+
   100% {
     transform: scale(0.95);
     opacity: 0.8;
@@ -323,9 +333,11 @@ canvas {
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -334,6 +346,7 @@ canvas {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -358,16 +371,16 @@ canvas {
     flex-direction: column;
     padding: 1rem;
   }
-  
+
   .demo-section {
     width: 100%;
     margin-bottom: 2rem;
   }
-  
+
   h1 {
     font-size: 2.2em;
   }
-  
+
   .nav-link {
     padding: 0.6rem 1.2rem;
     min-width: 110px;
@@ -378,52 +391,53 @@ canvas {
   .App {
     padding: 0.8rem;
   }
-  
+
   h1 {
     font-size: 2em;
     margin-bottom: 1.2rem;
   }
-  
+
   h1::after {
     width: 80%;
   }
-  
+
   .welcome {
     padding: 1.5rem;
   }
-  
+
   .nav-menu {
     gap: 0.8rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .camera-container,
   .segmentation-container {
     max-width: 100%;
   }
-  
+
   .video-container {
     aspect-ratio: 1/1;
   }
-  
+
   .fps-display {
     align-self: center;
     margin-top: 0.8rem;
     font-size: 0.8em;
   }
-  
+
   .controls {
     padding: 0.8rem;
     margin-top: 1rem;
     flex-direction: column;
     align-items: stretch;
   }
-  
-  .interaction-toggle, .reset-model {
+
+  .interaction-toggle,
+  .reset-model {
     width: 100%;
     justify-content: center;
   }
-  
+
   .interaction-tips {
     font-size: 0.9em;
   }
@@ -433,29 +447,29 @@ canvas {
   .App {
     padding: 0.5rem;
   }
-  
+
   h1 {
     font-size: 1.8em;
     margin-bottom: 1rem;
   }
-  
+
   .nav-menu {
     flex-direction: column;
     width: 100%;
   }
-  
+
   .nav-link {
     width: 100%;
   }
-  
+
   .welcome p {
     font-size: 1em;
   }
-  
+
   .interaction-tips {
     padding: 0.8rem;
   }
-  
+
   .fps-display {
     font-size: 0.7em;
     padding: 0.4rem 0.8rem;
@@ -479,7 +493,8 @@ canvas {
   border: 1px solid rgba(123, 131, 255, 0.2);
 }
 
-.interaction-toggle, .reset-model {
+.interaction-toggle,
+.reset-model {
   padding: 0.7rem 1.3rem;
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
@@ -494,7 +509,7 @@ canvas {
   font-weight: 500;
 }
 
-.interaction-toggle::before, 
+.interaction-toggle::before,
 .reset-model::before {
   font-size: 1.2em;
 }
@@ -513,14 +528,16 @@ canvas {
   content: '🔄';
 }
 
-.interaction-toggle:hover, .reset-model:hover {
+.interaction-toggle:hover,
+.reset-model:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(123, 131, 255, 0.3);
   background: rgba(123, 131, 255, 0.3);
   color: white;
 }
 
-.interaction-toggle:active, .reset-model:active {
+.interaction-toggle:active,
+.reset-model:active {
   transform: translateY(1px);
 }
 
@@ -536,8 +553,15 @@ canvas {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .interaction-tips p {
@@ -675,22 +699,22 @@ footer p {
   header {
     margin-bottom: 1.5rem;
   }
-  
+
   .feature-list {
     flex-direction: column;
     gap: 1rem;
     align-items: center;
   }
-  
+
   .feature {
     max-width: 100%;
     padding: 1rem;
   }
-  
+
   .feature-icon {
     font-size: 2rem;
   }
-  
+
   footer {
     margin-top: 1.5rem;
     padding: 0.8rem;
@@ -701,17 +725,17 @@ footer p {
   .nav-link .text {
     display: none;
   }
-  
+
   .nav-link .icon {
     font-size: 1.5rem;
     margin-right: 0;
   }
-  
+
   .nav-link {
     min-width: 60px;
     padding: 0.8rem;
   }
-  
+
   .nav-menu {
     flex-direction: row;
     width: auto;
@@ -770,14 +794,27 @@ footer p {
 }
 
 @keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
 }
 
 /* 提示关闭按钮 */
@@ -874,6 +911,7 @@ footer p {
 
 /* 增强触控反馈 */
 @media (hover: none) {
+
   .class-tag:active,
   .nav-link:active,
   button:active {
@@ -899,21 +937,21 @@ footer p {
     padding-top: 0.5rem;
     margin-bottom: 0.5rem;
   }
-  
+
   main {
     padding: 0.5rem;
   }
-  
+
   .video-container {
     max-height: 65vh;
     aspect-ratio: 16/9;
   }
-  
+
   canvas {
     max-height: 65vh;
   }
 
-  .camera-container, 
+  .camera-container,
   .segmentation-container {
     margin-bottom: 1rem;
   }
@@ -1081,7 +1119,7 @@ footer p {
   z-index: 110;
 }
 
-.interaction-toggle, 
+.interaction-toggle,
 .reset-model {
   width: 50px;
   height: 50px;
@@ -1114,7 +1152,7 @@ footer p {
   font-size: 1.3rem;
 }
 
-.interaction-toggle:hover, 
+.interaction-toggle:hover,
 .reset-model:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
@@ -1185,32 +1223,32 @@ footer p {
     right: 15px;
     gap: 8px;
   }
-  
+
   .model-type-selector,
   .model-action-selector,
   .effects-toggle {
     width: 38px;
     height: 38px;
   }
-  
+
   .model-type-selector:hover,
   .model-action-selector:hover {
     min-width: 140px;
   }
-  
+
   .model-type-option,
   .model-option {
     padding: 5px 8px;
     font-size: 0.7rem;
   }
-  
+
   .interaction-tips {
     top: 15px;
     left: 15px;
     max-width: 180px;
     padding: 8px;
   }
-  
+
   .interaction-tips li {
     font-size: 0.75rem;
     margin-bottom: 5px;
@@ -1224,24 +1262,24 @@ footer p {
     right: 10px;
     gap: 6px;
   }
-  
+
   .controls {
     bottom: 10px;
   }
-  
-  .interaction-toggle, 
+
+  .interaction-toggle,
   .reset-model {
     width: 40px;
     height: 40px;
   }
-  
+
   .interaction-tips {
     top: 10px;
     left: 10px;
     max-width: 160px;
     padding: 6px 8px;
   }
-  
+
   .interaction-tips li {
     font-size: 0.7rem;
     margin-bottom: 4px;
@@ -1272,10 +1310,25 @@ footer p {
 }
 
 @keyframes fadeInOut {
-  0% { opacity: 0; transform: translate(-50%, -20px); }
-  10% { opacity: 1; transform: translate(-50%, 0); }
-  90% { opacity: 1; transform: translate(-50%, 0); }
-  100% { opacity: 0; transform: translate(-50%, -20px); }
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+
+  10% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  90% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
 }
 
 /* 分割容器样式 */
@@ -1326,11 +1379,13 @@ footer p {
   display: inline-block;
 }
 
-.slider-control, .color-control {
+.slider-control,
+.color-control {
   margin: 15px 0;
 }
 
-.slider-control label, .color-control label {
+.slider-control label,
+.color-control label {
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
@@ -1411,11 +1466,11 @@ footer p {
   .segmentation-container {
     padding: 10px;
   }
-  
+
   .control-panel {
     padding: 10px;
   }
-  
+
   .loading p {
     font-size: 16px;
     padding: 10px 20px;
