@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 import { useState, useEffect } from 'react';
 import Camera from './components/Camera'
 import SemanticSegmentation from './components/SemanticSegmentation'
+import CustomSegmentation from './components/CustomSegmentation'
 import './App.css'
 
 function App() {
@@ -33,6 +34,10 @@ function App() {
               <span className="icon">🌍</span>
               <span className="text">语义分割</span>
             </Link>
+            <Link to="/custom" className="nav-link">
+              <span className="icon">🎭</span>
+              <span className="text">自定义分割</span>
+            </Link>
           </nav>
         </header>
 
@@ -40,6 +45,7 @@ function App() {
           <Routes>
             <Route path="/person" element={<Camera />} />
             <Route path="/semantic" element={<SemanticSegmentation />} />
+            <Route path="/custom" element={<CustomSegmentation />} />
             <Route path="/" element={
               <div className="welcome">
                 <h2>欢迎使用 WebAR 演示</h2>
@@ -60,6 +66,13 @@ function App() {
                     <div className="feature-text">
                       <h3>语义分割</h3>
                       <p>识别视频中的物体类别，并以不同颜色显示</p>
+                    </div>
+                  </div>
+                  <div className="feature">
+                    <div className="feature-icon">🎭</div>
+                    <div className="feature-text">
+                      <h3>自定义分割</h3>
+                      <p>使用自定义TensorFlow.js模型进行人像分割</p>
                     </div>
                   </div>
                 </div>
