@@ -5,6 +5,7 @@ import { PASCAL_CLASSES } from '../constants/segmentationClasses';
 import { useSegmentationRenderer } from '../hooks/useSegmentationRenderer';
 import { useCamera } from '../hooks/useCamera';
 import { useFPS } from '../hooks/useFPS';
+import UIControlPanel from './UIControlPanel';
 
 const SemanticSegmentation = () => {
     const videoRef = useRef(null);
@@ -13,6 +14,12 @@ const SemanticSegmentation = () => {
     const [loading, setLoading] = useState(true);
     const [selectedClass, setSelectedClass] = useState(null);
     const [detectedClasses, setDetectedClasses] = useState([]);
+    const [selectedModel, setSelectedModel] = useState('pascal');
+    const [modelParams, setModelParams] = useState({
+        quantizationBytes: 2,
+        threshold: 0.5,
+        alpha: 0.6
+    });
     
     const { fps, updateFPS } = useFPS();
     const { setupCamera } = useCamera(videoRef);
@@ -42,12 +49,13 @@ const SemanticSegmentation = () => {
     // 初始化模型
     const loadModel = async () => {
         try {
+            setLoading(true);
             await tf.ready();
             await tf.setBackend('webgl');
             
             const model = await semanticSegmentation.load({
-                base: 'pascal',
-                quantizationBytes: 2
+                base: selectedModel,
+                quantizationBytes: modelParams.quantizationBytes
             });
             
             setModel(model);
@@ -78,7 +86,14 @@ const SemanticSegmentation = () => {
             }
             
             // 渲染分割结果，根据selectedClass过滤
-            await renderSegmentation(video, segmentation, PASCAL_CLASSES, selectedClass);
+            await renderSegmentation(
+                video, 
+                segmentation, 
+                PASCAL_CLASSES, 
+                selectedClass, 
+                modelParams.alpha, 
+                modelParams.threshold
+            );
             
             // 更新FPS
             updateFPS();
@@ -170,10 +185,16 @@ const SemanticSegmentation = () => {
         }
     };
 
+    // 当选择的模型或参数变化时，重新加载模型
     useEffect(() => {
+        if (model) {
+            // 释放旧模型资源
+            model.dispose && model.dispose();
+        }
         loadModel();
-    }, []);
+    }, [selectedModel, modelParams.quantizationBytes]);
 
+    // 模型加载后启动分割
     useEffect(() => {
         if (model) {
             startSegmentation();
@@ -216,26 +237,17 @@ const SemanticSegmentation = () => {
                 />
             </div>
             
-            <div className="fps-display">
-                FPS: {fps}
-            </div>
-            
-            {detectedClasses.length > 0 && (
-                <div className="detected-classes">
-                    <h3>检测到的物体:</h3>
-                    <div className="class-tags">
-                        {detectedClasses.map(cls => (
-                            <button 
-                                key={cls.id}
-                                className={`class-tag ${selectedClass === cls.id ? 'active' : ''}`}
-                                onClick={() => toggleClass(cls.id)}
-                            >
-                                {cls.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {/* 使用新的UI控制面板 */}
+            <UIControlPanel 
+                fps={fps}
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+                modelParams={modelParams}
+                setModelParams={setModelParams}
+                detectedClasses={detectedClasses}
+                selectedClass={selectedClass}
+                toggleClass={toggleClass}
+            />
         </div>
     );
 };
