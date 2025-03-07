@@ -39,6 +39,7 @@ class ThreeScene {
         path: "/Fox.glb",
         scale: 0.005,
         yOffset: -0.5,
+        rotation: Math.PI / 4,
         defaultAnimation: 0,
         particleEffect: {
           color: [0.7, 0.3, 0.1], // 橙色粒子
@@ -52,6 +53,7 @@ class ThreeScene {
         path: "/Fox.glb",
         scale: 0.005,
         yOffset: -0.5,
+        rotation: Math.PI / 4,
         defaultAnimation: 1,
         particleEffect: {
           color: [0.1, 0.5, 0.9], // 蓝色粒子
@@ -65,6 +67,7 @@ class ThreeScene {
         path: "/Fox.glb",
         scale: 0.005,
         yOffset: -0.5,
+        rotation: Math.PI / 4,
         defaultAnimation: 2,
         particleEffect: {
           color: [0.2, 0.8, 0.2], // 绿色粒子
@@ -78,6 +81,7 @@ class ThreeScene {
         path: "/Bird.glb",
         scale: 0.0002,
         yOffset: -0.3,
+        rotation: Math.PI / 2,
         defaultAnimation: 0,
         particleEffect: {
           color: [0.1, 0.3, 0.9], // 蓝色粒子
@@ -152,72 +156,79 @@ class ThreeScene {
   }
 
   loadModel(modelIndex = 0) {
-    // 保存当前模型索引
-    this.currentModelIndex = modelIndex;
-    const modelConfig = this.modelOptions[modelIndex];
-
-    // 清除现有模型
+    // 清理之前的模型
     if (this.model) {
       this.scene.remove(this.model);
-      if (this.mixer) {
-        this.mixer = null;
-      }
+      this.model = null;
     }
 
+    // 如果有动画混合器，也需要清理
+    if (this.mixer) {
+      this.mixer = null;
+    }
+
+    // 重置动画数组
+    this.animations = [];
+
+    // 获取选中的模型选项
+    const modelOption = this.modelOptions[modelIndex] || this.modelOptions[0];
+    this.currentModelIndex = modelIndex;
+
+    // 加载GLB模型 - 处理动画
     const loader = new GLTFLoader();
 
     loader.load(
-      modelConfig.path,
+      modelOption.path,
       (gltf) => {
+        // 保存模型引用
         this.model = gltf.scene;
 
-        // 调整模型大小和位置
-        this.model.scale.set(
-          modelConfig.scale,
-          modelConfig.scale,
-          modelConfig.scale
-        );
-        this.model.position.set(0, modelConfig.yOffset, 0);
-        this.model.rotation.y = Math.PI / 4;
+        // 应用模型选项中的缩放 - 这里确保使用modelOption.scale而不是this.initialScale
+        // 修改这里，确保缩放正确应用
+        const modelScale = modelOption.scale || this.initialScale;
+        this.model.scale.set(modelScale, modelScale, modelScale);
+        this.currentScale = modelScale; // 更新当前缩放值
 
-        // 初始化当前位置和缩放
-        this.currentPosition.x = this.model.position.x;
-        this.currentPosition.y = this.model.position.y;
-        this.currentScale = modelConfig.scale;
-        this.targetPosition.x = this.currentPosition.x;
-        this.targetPosition.y = this.currentPosition.y;
-        this.targetScale = this.currentScale;
-        this.initialScale = modelConfig.scale;
+        // 应用Y轴偏移，使模型位于地面上
+        if (modelOption.yOffset) {
+          this.model.position.y = modelOption.yOffset;
+        }
 
+        // 应用模型特定的旋转设置
+        const modelRotation =
+          modelOption.rotation !== undefined
+            ? modelOption.rotation
+            : this.initialRotationY;
+        this.currentRotationY = modelRotation;
+        this.model.rotation.y = this.currentRotationY;
+
+        // 添加模型到场景
         this.scene.add(this.model);
 
-        // 设置动画
-        if (gltf.animations && gltf.animations.length) {
+        // 处理动画
+        if (gltf.animations && gltf.animations.length > 0) {
           this.mixer = new THREE.AnimationMixer(this.model);
           this.animations = gltf.animations;
 
-          // 播放指定的默认动画
-          if (this.animations.length > 0) {
-            // 确保动画索引在有效范围内
-            const animIndex =
-              modelConfig.defaultAnimation !== undefined &&
-              modelConfig.defaultAnimation < this.animations.length
-                ? modelConfig.defaultAnimation
-                : 0;
-
-            const action = this.mixer.clipAction(this.animations[animIndex]);
+          // 播放默认动画
+          const defaultAnimIndex = modelOption.defaultAnimation || 0;
+          if (this.animations.length > defaultAnimIndex) {
+            const action = this.mixer.clipAction(
+              this.animations[defaultAnimIndex]
+            );
             action.play();
           }
         }
 
-        // 添加粒子效果
-        this.createParticleEffect();
+        // 如果模型已加载且粒子效果已启用，应用粒子效果
+        if (this.hasParticles) {
+          this.removeParticles(); // 先移除旧粒子
+          this.createParticleEffect(); // 创建新粒子
+        }
       },
-      (xhr) => {
-        console.log((xhr.loaded / xhr.total) * 100 + "% 已加载");
-      },
+      undefined,
       (error) => {
-        console.error("加载模型时出错:", error);
+        console.error("模型加载失败:", error);
       }
     );
   }
@@ -324,12 +335,20 @@ class ThreeScene {
   updateModelPosition(x, y, scale) {
     if (!this.model || this.isDisposed || !this.isInitialized) return;
 
+    // 获取当前模型配置
+    const modelOption = this.modelOptions[this.currentModelIndex];
+
+    // 计算模型特定的缩放因子
+    const modelSpecificScale = modelOption.name.includes("小鸟")
+      ? 0.0006
+      : 0.006;
+
     // 更新目标位置和缩放，而不是直接设置
     this.targetPosition.x = x;
     // 调整Y轴偏移，使模型更好地对齐人物
     this.targetPosition.y = y - 0.2; // 减小Y轴偏移量，使模型更接近人物顶部
-    // 缩放因子微调
-    this.targetScale = scale * 0.006; // 略微增加缩放比例，让模型更贴合人物
+    // 缩放因子微调 - 使用模型特定的缩放因子
+    this.targetScale = scale * modelSpecificScale;
 
     // 当检测到大幅度位置变化时，直接更新当前位置，避免跟踪滞后
     const positionDeltaX = Math.abs(
@@ -459,11 +478,19 @@ class ThreeScene {
   resetModelTransform() {
     if (!this.model) return;
 
+    // 获取当前模型配置
+    const modelOption = this.modelOptions[this.currentModelIndex];
+    const modelRotation =
+      modelOption.rotation !== undefined
+        ? modelOption.rotation
+        : this.initialRotationY;
+    const modelScale = modelOption.scale || this.initialScale;
+
     // 设置目标值，而不是直接修改
-    this.targetScale = this.initialScale;
-    this.currentRotationY = this.initialRotationY;
+    this.targetScale = modelScale;
+    this.currentRotationY = modelRotation;
     this.targetPosition.x = 0;
-    this.targetPosition.y = -0.4; // 调整为与新的Y轴偏移一致
+    this.targetPosition.y = modelOption.yOffset || -0.4; // 使用模型特定的Y轴偏移
 
     // 直接重置当前位置，确保立即响应
     this.currentPosition.x = this.targetPosition.x;
@@ -663,7 +690,7 @@ class ThreeScene {
       // 添加简单的波动动画
       const ix = i * 3;
       const iy = i * 3 + 1;
-      const iz = i * 3 + 2;
+      // const iz = i * 3 + 2; // 注释掉未使用的变量
 
       // 应用正弦波动
       positions[iy] += Math.sin(time + positions[ix]) * 0.003;
