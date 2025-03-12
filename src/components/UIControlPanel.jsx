@@ -230,6 +230,8 @@ const UIControlPanel = ({
                     <ul>
                       <li>单指滑动：旋转模型</li>
                       <li>双指捏合：缩放模型</li>
+                      <li>鼠标拖动：旋转模型</li>
+                      <li>鼠标滚轮：缩放模型</li>
                       <li>可选择不同动作和特效效果</li>
                     </ul>
                   </div>

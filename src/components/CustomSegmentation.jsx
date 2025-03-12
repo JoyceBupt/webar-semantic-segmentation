@@ -605,16 +605,33 @@ const CustomSegmentation = () => {
     }, [currentModelIndex]);
 
     return (
-        <div className="camera-container">
+        <div className="segmentation-container">
             {loading && (
                 <div className="loading">
-                    <p>自定义分割模型加载中...</p>
+                    <p>模型加载中</p>
                 </div>
             )}
             
             {modelError && (
                 <div className="error-message">
                     <p>{modelError}</p>
+                </div>
+            )}
+            
+            {showTips && (
+                <div className="tips-overlay">
+                    <div className="tips-content">
+                        <h3>交互提示</h3>
+                        <p>您可以通过以下方式与模型交互：</p>
+                        <ul>
+                            <li>鼠标拖动：旋转模型</li>
+                            <li>鼠标滚轮：缩放模型</li>
+                            <li>触摸屏设备上可使用单指滑动和双指捏合</li>
+                        </ul>
+                        <button className="close-tips-btn" onClick={closeTips}>
+                            我知道了
+                        </button>
+                    </div>
                 </div>
             )}
             

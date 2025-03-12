@@ -18,6 +18,7 @@ class ThreeScene {
     // 交互控制相关属性
     this.isDragging = false;
     this.previousTouch = null;
+    this.previousMouse = null; // 添加鼠标位置跟踪
     this.initialScale = 0.005;
     this.currentScale = this.initialScale;
     this.initialRotationY = Math.PI / 4;
@@ -382,6 +383,13 @@ class ThreeScene {
     this.canvas.addEventListener("touchmove", this.handleTouchMove);
     this.canvas.addEventListener("touchend", this.handleTouchEnd);
 
+    // 添加鼠标事件监听器
+    this.canvas.addEventListener("mousedown", this.handleMouseDown);
+    this.canvas.addEventListener("mousemove", this.handleMouseMove);
+    this.canvas.addEventListener("mouseup", this.handleMouseUp);
+    this.canvas.addEventListener("mouseleave", this.handleMouseUp);
+    this.canvas.addEventListener("wheel", this.handleMouseWheel);
+
     // 修改canvas样式，使其可以接收事件
     this.canvas.style.pointerEvents = "auto";
 
@@ -398,6 +406,13 @@ class ThreeScene {
     this.canvas.removeEventListener("touchstart", this.handleTouchStart);
     this.canvas.removeEventListener("touchmove", this.handleTouchMove);
     this.canvas.removeEventListener("touchend", this.handleTouchEnd);
+
+    // 移除鼠标事件监听器
+    this.canvas.removeEventListener("mousedown", this.handleMouseDown);
+    this.canvas.removeEventListener("mousemove", this.handleMouseMove);
+    this.canvas.removeEventListener("mouseup", this.handleMouseUp);
+    this.canvas.removeEventListener("mouseleave", this.handleMouseUp);
+    this.canvas.removeEventListener("wheel", this.handleMouseWheel);
 
     // 恢复canvas样式
     this.canvas.style.pointerEvents = "none";
@@ -472,6 +487,59 @@ class ThreeScene {
   handleTouchEnd = () => {
     this.isDragging = false;
     this.previousTouch = null;
+  };
+
+  // 处理鼠标按下事件
+  handleMouseDown = (event) => {
+    event.preventDefault();
+
+    if (!this.model) return;
+
+    this.isDragging = true;
+    this.previousMouse = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  // 处理鼠标移动事件
+  handleMouseMove = (event) => {
+    event.preventDefault();
+
+    if (!this.model || !this.isDragging || !this.previousMouse) return;
+
+    const deltaX = event.clientX - this.previousMouse.x;
+
+    // 根据水平移动旋转模型
+    this.currentRotationY += deltaX * 0.01;
+    this.model.rotation.y = this.currentRotationY;
+
+    this.previousMouse = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  // 处理鼠标释放事件
+  handleMouseUp = () => {
+    this.isDragging = false;
+    this.previousMouse = null;
+  };
+
+  // 处理鼠标滚轮事件
+  handleMouseWheel = (event) => {
+    event.preventDefault();
+
+    if (!this.model) return;
+
+    // 获取滚轮方向
+    const delta = Math.sign(event.deltaY) * -0.0005;
+
+    // 计算新的缩放值
+    const newScale = this.currentScale + delta;
+
+    // 限制缩放范围
+    this.targetScale = Math.max(0.001, Math.min(0.02, newScale));
   };
 
   // 重置模型位置和旋转
