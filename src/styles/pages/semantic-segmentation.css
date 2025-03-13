@@ -96,6 +96,48 @@
   border-radius: 2px;
 }
 
+/* 添加检测到的类别样式 */
+.detected-classes {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px;
+  border-radius: 8px;
+  color: white;
+  max-width: 200px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(100, 108, 255, 0.2);
+  z-index: 100;
+}
+
+.detected-classes h3 {
+  margin: 0 0 10px 0;
+  font-size: 1em;
+  text-align: center;
+}
+
+.class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.class-label {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.class-label:hover {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+.class-label.selected {
+  background: rgba(100, 108, 255, 0.5);
+}
+
 @media (max-width: 768px) {
   .segmentation-container {
     height: calc(100vh - 140px);
@@ -106,5 +148,11 @@
     top: 10px;
     left: 10px;
     font-size: 1em;
+  }
+  
+  .detected-classes {
+    bottom: 10px;
+    right: 10px;
+    max-width: 150px;
   }
 } 
