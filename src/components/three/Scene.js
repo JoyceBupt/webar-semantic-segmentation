@@ -25,6 +25,8 @@ class ThreeScene {
     this.currentRotationY = this.initialRotationY;
     this.pinchStartDistance = 0;
     this.isInteractionEnabled = false;
+    this.hasParticles = true; // 默认启用粒子效果
+    this.userInteracted = false; // 添加用户交互标志
 
     // 添加模型位置相关属性，用于平滑过渡
     this.targetPosition = { x: 0, y: 0 };
@@ -88,6 +90,48 @@ class ThreeScene {
           color: [0.1, 0.3, 0.9], // 蓝色粒子
           count: 180,
           size: 0.02,
+          opacity: 0.65,
+        },
+      },
+      {
+        name: "小兔子",
+        path: "/bunny.glb",
+        scale: 0.01,
+        yOffset: -0.4,
+        rotation: Math.PI / 2,
+        defaultAnimation: 0,
+        particleEffect: {
+          color: [0.9, 0.5, 0.7], // 粉色粒子
+          count: 200,
+          size: 0.02,
+          opacity: 0.7,
+        },
+      },
+      {
+        name: "蒟蒻",
+        path: "/konnyaku.glb",
+        scale: 0.04,
+        yOffset: -0.5,
+        rotation: Math.PI / 4,
+        defaultAnimation: 0,
+        particleEffect: {
+          color: [0.6, 0.2, 0.8], // 紫色粒子
+          count: 220,
+          size: 0.025,
+          opacity: 0.6,
+        },
+      },
+      {
+        name: "小栗子",
+        path: "/little_chestnut.glb",
+        scale: 0.035,
+        yOffset: -0.45,
+        rotation: Math.PI / 3,
+        defaultAnimation: 0,
+        particleEffect: {
+          color: [0.8, 0.4, 0.1], // 棕色粒子
+          count: 190,
+          size: 0.022,
           opacity: 0.65,
         },
       },
@@ -171,6 +215,9 @@ class ThreeScene {
     // 重置动画数组
     this.animations = [];
 
+    // 重置用户交互标志
+    this.userInteracted = false;
+
     // 获取选中的模型选项
     const modelOption = this.modelOptions[modelIndex] || this.modelOptions[0];
     this.currentModelIndex = modelIndex;
@@ -218,7 +265,14 @@ class ThreeScene {
               this.animations[defaultAnimIndex]
             );
             action.play();
+          } else if (this.animations.length > 0) {
+            // 如果指定的默认动画不存在但有其他动画，播放第一个动画
+            const action = this.mixer.clipAction(this.animations[0]);
+            action.play();
           }
+        } else {
+          // 如果模型没有动画，记录信息但不影响模型显示
+          console.log(`模型 ${modelOption.name} 没有动画`);
         }
 
         // 如果模型已加载且粒子效果已启用，应用粒子效果
@@ -340,16 +394,29 @@ class ThreeScene {
     const modelOption = this.modelOptions[this.currentModelIndex];
 
     // 计算模型特定的缩放因子
-    const modelSpecificScale = modelOption.name.includes("小鸟")
-      ? 0.0006
-      : 0.006;
+    let modelSpecificScale = 0.006; // 默认缩放因子
+
+    // 根据模型名称设置不同的缩放因子
+    if (modelOption.name.includes("小鸟")) {
+      modelSpecificScale = 0.0005;
+    } else if (modelOption.name.includes("小兔子")) {
+      modelSpecificScale = 0.3;
+    } else if (modelOption.name.includes("蒟蒻")) {
+      modelSpecificScale = 0.04;
+    } else if (modelOption.name.includes("小栗子")) {
+      modelSpecificScale = 0.03;
+    }
 
     // 更新目标位置和缩放，而不是直接设置
     this.targetPosition.x = x;
     // 调整Y轴偏移，使模型更好地对齐人物
     this.targetPosition.y = y - 0.2; // 减小Y轴偏移量，使模型更接近人物顶部
-    // 缩放因子微调 - 使用模型特定的缩放因子
-    this.targetScale = scale * modelSpecificScale;
+
+    // 只有在用户未交互或刚刚切换模型时才更新缩放
+    if (!this.userInteracted) {
+      // 缩放因子微调 - 使用模型特定的缩放因子
+      this.targetScale = scale * modelSpecificScale;
+    }
 
     // 当检测到大幅度位置变化时，直接更新当前位置，避免跟踪滞后
     const positionDeltaX = Math.abs(
@@ -475,11 +542,20 @@ class ThreeScene {
       // 基于初始缩放值计算新的缩放值
       const newScale = this.pinchStartScale * scaleFactor;
 
+      // 获取当前模型配置
+      const modelOption = this.modelOptions[this.currentModelIndex];
+
+      // 获取模型的缩放范围限制
+      const { minScale, maxScale } = this.getModelScaleRange(modelOption.name);
+
       // 限制缩放范围
-      const limitedScale = Math.max(0.001, Math.min(0.02, newScale));
+      const limitedScale = Math.max(minScale, Math.min(maxScale, newScale));
 
       // 更新目标缩放
       this.targetScale = limitedScale;
+
+      // 标记用户已交互
+      this.userInteracted = true;
     }
   };
 
@@ -526,11 +602,39 @@ class ThreeScene {
     this.previousMouse = null;
   };
 
+  // 获取模型的缩放范围限制
+  getModelScaleRange(modelName) {
+    let minScale, maxScale;
+
+    if (modelName.includes("小鸟")) {
+      minScale = 0.0001;
+      maxScale = 0.001;
+    } else if (modelName.includes("小兔子")) {
+      minScale = 0.005;
+      maxScale = 0.05;
+    } else if (modelName.includes("蒟蒻")) {
+      minScale = 0.01;
+      maxScale = 0.1;
+    } else if (modelName.includes("小栗子")) {
+      minScale = 0.01;
+      maxScale = 0.1;
+    } else {
+      // 默认值（适用于狐狸等模型）
+      minScale = 0.001;
+      maxScale = 0.02;
+    }
+
+    return { minScale, maxScale };
+  }
+
   // 处理鼠标滚轮事件
   handleMouseWheel = (event) => {
     event.preventDefault();
 
     if (!this.model) return;
+
+    // 获取当前模型配置
+    const modelOption = this.modelOptions[this.currentModelIndex];
 
     // 获取滚轮方向
     const delta = Math.sign(event.deltaY) * -0.0005;
@@ -538,8 +642,14 @@ class ThreeScene {
     // 计算新的缩放值
     const newScale = this.currentScale + delta;
 
+    // 获取模型的缩放范围限制
+    const { minScale, maxScale } = this.getModelScaleRange(modelOption.name);
+
     // 限制缩放范围
-    this.targetScale = Math.max(0.001, Math.min(0.02, newScale));
+    this.targetScale = Math.max(minScale, Math.min(maxScale, newScale));
+
+    // 标记用户已交互
+    this.userInteracted = true;
   };
 
   // 重置模型位置和旋转
@@ -576,6 +686,9 @@ class ThreeScene {
       this.currentScale,
       this.currentScale
     );
+
+    // 重置用户交互标志
+    this.userInteracted = false;
   }
 
   // 停止渲染
@@ -779,6 +892,21 @@ class ThreeScene {
         this.particles.geometry.dispose();
       }
       this.particles = null;
+    }
+  }
+
+  // 切换粒子效果
+  toggleParticles(enabled) {
+    if (enabled !== undefined) {
+      this.hasParticles = enabled;
+    } else {
+      this.hasParticles = !this.hasParticles;
+    }
+
+    if (this.hasParticles) {
+      this.createParticleEffect();
+    } else {
+      this.removeParticles();
     }
   }
 }
