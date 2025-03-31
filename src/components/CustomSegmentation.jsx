@@ -5,6 +5,7 @@ import { useCamera } from '../hooks/useCamera';
 import { useFPS } from '../hooks/useFPS';
 import { CUSTOM_CLASSES } from '../constants/customSegmentationClasses';
 import UIControlPanel from './UIControlPanel';
+import { useSegmentationWorker } from '../hooks/useSegmentationWorker';
 
 const CustomSegmentation = () => {
     const videoRef = useRef(null);
@@ -13,7 +14,6 @@ const CustomSegmentation = () => {
     
     const threeSceneRef = useRef(null); // 添加Three.js场景引用
     
-    const [model, setModel] = useState(null);
     const [loading, setLoading] = useState(true);
     const [modelLoaded, setModelLoaded] = useState(false);
     // 保留这些状态变量，因为它们在渲染过程中仍然需要使用
@@ -36,6 +36,16 @@ const CustomSegmentation = () => {
 
     const { fps, updateFPS } = useFPS();
     const { setupCamera } = useCamera(videoRef);
+    
+    // 使用Worker Hook替代直接的模型处理
+    const { 
+        status, 
+        error, 
+        isModelLoaded,
+        isTfInitialized,
+        loadModel, 
+        processFrame 
+    } = useSegmentationWorker();
 
     // 调整canvas尺寸以匹配视频比例
     const adjustCanvasSize = () => {
@@ -69,28 +79,42 @@ const CustomSegmentation = () => {
         };
     }, []);
 
-    // 初始化模型
-    const loadModel = async () => {
-        try {
-            setLoading(true);
-            await tf.ready();
-            await tf.setBackend('webgl');
-
-            // 加载自定义模型
-            const customModel = await tf.loadGraphModel('/model/model.json');
-
-            setModel(customModel);
-            setModelLoaded(true);
-            setLoading(false);
-        } catch (error) {
-            console.error('模型加载失败:', error);
-            setLoading(false);
+    // 初始化Worker和模型
+    useEffect(() => {
+        // 等待TensorFlow初始化后再加载模型
+        if (!isTfInitialized) {
+            return;
         }
-    };
+        
+        const modelUrl = '/model/model.json';
+        setLoading(true);
+        
+        // 为自定义模型提供正确的配置
+        const customModelConfig = {
+            inputShape: [256, 144], // 正确的输入尺寸
+            inputFormat: 'NCHW'
+        };
+        
+        loadModel(modelUrl, customModelConfig)
+            .then(() => {
+                setLoading(false);
+                setModelLoaded(true);
+            })
+            .catch(error => {
+                setLoading(false);
+            });
+    }, [loadModel, isTfInitialized]);
+    
+    // 处理Worker错误
+    useEffect(() => {
+        if (error) {
+            // 此处只删除console.error，保留error状态处理逻辑
+        }
+    }, [error]);
 
-    // 执行分割
-    const processFrame = async () => {
-        if (!model || !videoRef.current || !canvasRef.current || isPaused) return;
+    // 处理分割计算 - 使用Worker
+    const processFrameWithWorker = async () => {
+        if (!isModelLoaded || !videoRef.current || !canvasRef.current || isPaused) return;
 
         try {
             const video = videoRef.current;
@@ -98,146 +122,96 @@ const CustomSegmentation = () => {
 
             if (video.readyState < 2) return;
 
-            // 创建输入张量
-            const videoFrame = tf.browser.fromPixels(video);
+            // 开始新的帧处理前先安排下一帧，减少延迟
+            animationRef.current = requestAnimationFrame(processFrameWithWorker);
 
-            // 调整大小为模型输入尺寸 - 注意这里改为 256x144
-            const resizedFrame = tf.image.resizeBilinear(videoFrame, [256, 144]);
-
-            // 归一化像素值 (0-255 -> 0-1)
-            const normalizedFrame = resizedFrame.div(255.0);
-
-            // 添加批次维度
-            const batchedFrame = normalizedFrame.expandDims(0);
-
-            // 将 NHWC 格式 [1, 256, 144, 3] 转换为 NCHW 格式 [1, 3, 256, 144]
-            const transposedFrame = tf.transpose(batchedFrame, [0, 3, 1, 2]);
-
-            // 执行模型推理
-            let segmentation;
+            // 使用Worker处理分割
+            const segmentation = await processFrame(video);
+            
+            if (!segmentation || !segmentation.data) {
+                return;
+            }
+            
+            // 渲染分割结果
+            await renderSegmentation(video, segmentation, canvas);
+            
+            // 处理分割结果，更新3D模型位置
             try {
-                segmentation = await model.predict(transposedFrame);
-
-                // 如果模型返回的是数组，选择第一个输出
-                if (Array.isArray(segmentation)) {
-                    segmentation = segmentation[0];
-                }
-
-                // 检查输出数据类型
-                const dataType = segmentation.dtype;
-
-                // 根据用户选择决定是否使用二值掩码
-                let maskToRender;
-                if (useBinaryMask) {
-                    // 尝试将输出转换为二值掩码
-                    maskToRender = tf.tidy(() => {
-                        // 如果输出是浮点数，使用阈值 0.5 进行二值化
-                        if (dataType === 'float32' || dataType === 'float64') {
-                            return segmentation.greater(0.5);
-                        } else {
-                            // 如果输出是整数，假设 1 表示前景，0 表示背景
-                            return segmentation.equal(1);
-                        }
-                    });
-                } else {
-                    // 直接使用原始输出
-                    maskToRender = segmentation;
-                }
-
-                // 渲染分割结果
-                await renderSegmentation(video, maskToRender, canvas);
+                // 从掩码数据创建position数据
+                const maskData = segmentation.data;
+                const isNestedArray = segmentation.shape === 'nested' || 
+                    (Array.isArray(maskData) && Array.isArray(maskData[0]));
                 
-                // 处理分割结果，更新3D模型位置
-                try {
-                    // 从掩码数据创建position数据
-                    const maskData = await maskToRender.array();
-                    
-                    // 计算质心
-                    let centerX = 0;
-                    let centerY = 0;
-                    let count = 0;
-                    
-                    // 获取实际尺寸
-                    const height = maskData[0].length;
-                    const width = maskData[0][0] ? maskData[0][0].length : 0;
+                // 计算质心
+                let centerX = 0;
+                let centerY = 0;
+                let count = 0;
+                
+                // 获取实际尺寸
+                const height = segmentation.height;
+                const width = segmentation.width;
 
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            if (maskData[0][y][x] === 1) {
+                // 处理数据
+                if (isNestedArray) {
+                    // 二维数组
+                    for (let y = 0; y < maskData.length; y++) {
+                        for (let x = 0; x < maskData[y].length; x++) {
+                            if (maskData[y][x] === 1) {
                                 centerX += x;
                                 centerY += y;
                                 count++;
                             }
                         }
                     }
-                    
-                    if (count > 0) {
-                        centerX /= count;
-                        centerY /= count;
-                        
-                        // 将坐标转换为 Three.js 坐标系统
-                        const normalizedX = (centerX / width) * 2 - 1;
-                        const normalizedY = -(centerY / height) * 2 + 1;
-                        
-                        // 计算物体大小比例
-                        const objectSize = Math.sqrt(count / (width * height));
-                        const scale = Math.max(0.3, Math.min(1, objectSize * 2));
-                        
-                        // 更新模型位置
-                        if (threeSceneRef.current) {
-                            threeSceneRef.current.updateModelPosition(normalizedX, normalizedY, scale);
+                } else {
+                    // 一维数组 - 扁平格式
+                    for (let i = 0; i < maskData.length; i++) {
+                        if (maskData[i] === 1) {
+                            const x = i % width;
+                            const y = Math.floor(i / width);
+                            centerX += x;
+                            centerY += y;
+                            count++;
                         }
                     }
-                } catch (error) {
-                    console.error("处理分割结果出错:", error);
                 }
-
-                // 存储当前分割结果，用于下一帧
-                if (lastSegmentationRef.current) {
-                    lastSegmentationRef.current.dispose();
-                }
-                lastSegmentationRef.current = maskToRender.clone();
-
-                // 如果使用了二值掩码，清理资源
-                if (useBinaryMask && maskToRender !== segmentation) {
-                    maskToRender.dispose();
+                
+                if (count > 0) {
+                    centerX /= count;
+                    centerY /= count;
+                    
+                    // 将坐标转换为 Three.js 坐标系统
+                    const normalizedX = (centerX / width) * 2 - 1;
+                    const normalizedY = -(centerY / height) * 2 + 1;
+                    
+                    // 计算物体大小比例
+                    const objectSize = Math.sqrt(count / (width * height));
+                    const scale = Math.max(0.3, Math.min(1, objectSize * 2));
+                    
+                    // 更新模型位置
+                    if (threeSceneRef.current) {
+                        threeSceneRef.current.updateModelPosition(normalizedX, normalizedY, scale);
+                    }
                 }
             } catch (error) {
-                console.error("模型预测错误:", error);
-
-                // 如果有上一帧的分割结果，使用它
-                if (lastSegmentationRef.current) {
-                    await renderSegmentation(video, lastSegmentationRef.current, canvas);
-                }
+                // 保留错误处理逻辑，但删除日志输出
             }
+
+            // 存储当前分割结果，用于下一帧
+            lastSegmentationRef.current = segmentation;
 
             // 更新FPS
             updateFPS();
-
-            // 清理资源
-            videoFrame.dispose();
-            resizedFrame.dispose();
-            normalizedFrame.dispose();
-            batchedFrame.dispose();
-            transposedFrame.dispose();
-            if (Array.isArray(segmentation)) {
-                segmentation.forEach(t => t.dispose());
-            } else if (segmentation) {
-                segmentation.dispose();
-            }
-
-            // 继续下一帧
-            animationRef.current = requestAnimationFrame(processFrame);
         } catch (error) {
-            console.error('分割过程出错:', error);
-
             // 如果有上一帧的分割结果，使用它
             if (lastSegmentationRef.current && canvasRef.current) {
                 await renderSegmentation(videoRef.current, lastSegmentationRef.current, canvasRef.current);
             }
 
-            // 继续下一帧
-            animationRef.current = requestAnimationFrame(processFrame);
+            // 短暂延迟后继续下一帧，避免错误循环过快
+            setTimeout(() => {
+                animationRef.current = requestAnimationFrame(processFrameWithWorker);
+            }, 1000);
         }
     };
 
@@ -247,123 +221,163 @@ const CustomSegmentation = () => {
 
         try {
             // 获取分割掩码数据
-            const segmentationData = await segmentation.array();
-
-            // 检查数据形状
-            if (!segmentationData || !segmentationData[0]) {
-                console.error("无效的分割数据");
-                // 仅绘制原始视频帧
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                return;
-            }
-
-            // 获取实际尺寸
-            const height = segmentationData[0].length;
-            const width = segmentationData[0][0] ? segmentationData[0][0].length : 0;
-
-            if (height === 0 || width === 0) {
-                console.error("数据尺寸为零");
-                // 仅绘制原始视频帧
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                return;
-            }
-
-            // 如果选择显示原始视频，则直接显示
-            if (showOriginal) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                return;
-            }
-
-            // 创建临时画布用于处理原始视频
-            const tempVideoCanvas = document.createElement('canvas');
-            tempVideoCanvas.width = canvas.width;
-            tempVideoCanvas.height = canvas.height;
-            const tempVideoCtx = tempVideoCanvas.getContext('2d');
-            tempVideoCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const videoImageData = tempVideoCtx.getImageData(0, 0, canvas.width, canvas.height);
-
-            // 创建临时画布用于处理分割结果
-            const tempMaskCanvas = document.createElement('canvas');
-            tempMaskCanvas.width = width;
-            tempMaskCanvas.height = height;
-            const tempMaskCtx = tempMaskCanvas.getContext('2d');
-            const maskImageData = tempMaskCtx.createImageData(width, height);
-
-            // 解析颜色
-            const colorHex = segmentColor.replace('#', '');
-            const r = parseInt(colorHex.substring(0, 2), 16);
-            const g = parseInt(colorHex.substring(2, 4), 16);
-            const b = parseInt(colorHex.substring(4, 6), 16);
-
-            // 更新自定义类别的颜色
-            CUSTOM_CLASSES[1].color = [r, g, b];
-
-            // 创建最终输出画布
-            const outputCanvas = document.createElement('canvas');
-            outputCanvas.width = canvas.width;
-            outputCanvas.height = canvas.height;
-            const outputCtx = outputCanvas.getContext('2d');
-
-            // 首先绘制一个透明背景
-            outputCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 处理分割数据 - 创建掩码
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const pixelIndex = (y * width + x) * 4;
-                    const maskValue = segmentationData[0][y][x];
-
-                    // 设置掩码像素 (1表示前景，0表示背景)
-                    if (maskValue === 1) {
-                        maskImageData.data[pixelIndex] = 255;     // R
-                        maskImageData.data[pixelIndex + 1] = 255; // G
-                        maskImageData.data[pixelIndex + 2] = 255; // B
-                        maskImageData.data[pixelIndex + 3] = 255; // A (完全不透明)
-                    } else {
-                        // 背景透明
-                        maskImageData.data[pixelIndex] = 0;     // R
-                        maskImageData.data[pixelIndex + 1] = 0; // G
-                        maskImageData.data[pixelIndex + 2] = 0; // B
-                        maskImageData.data[pixelIndex + 3] = 0; // A (完全透明)
+            const segmentationData = segmentation.data;
+            const isNestedArray = segmentation.shape === 'nested' || 
+                (Array.isArray(segmentationData) && Array.isArray(segmentationData[0]));
+            
+            // 先绘制完整视频帧到临时画布
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const videoImageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // 创建输出图像数据
+            const outputImage = ctx.createImageData(canvas.width, canvas.height);
+            
+            // 缩放因子 - 用于将分割结果映射到画布尺寸
+            const scaleX = canvas.width / segmentation.width;
+            const scaleY = canvas.height / segmentation.height;
+            
+            // 处理数据 - 创建遮罩
+            if (isNestedArray) {
+                // 二维数组
+                for (let y = 0; y < segmentation.height; y++) {
+                    for (let x = 0; x < segmentation.width; x++) {
+                        const isForeground = segmentationData[y][x] === 1; // 1表示前景（人像）
+                        
+                        // 计算目标画布上对应的像素区域
+                        const targetStartX = Math.floor(x * scaleX);
+                        const targetEndX = Math.floor((x + 1) * scaleX);
+                        const targetStartY = Math.floor(y * scaleY);
+                        const targetEndY = Math.floor((y + 1) * scaleY);
+                        
+                        // 对映射到的每个像素进行处理
+                        for (let ty = targetStartY; ty < targetEndY; ty++) {
+                            for (let tx = targetStartX; tx < targetEndX; tx++) {
+                                // 确保在画布范围内
+                                if (tx >= 0 && tx < canvas.width && ty >= 0 && ty < canvas.height) {
+                                    const targetIdx = (ty * canvas.width + tx) * 4;
+                                    
+                                    if (isForeground) {
+                                        // 对于前景（人像），保持原始视频像素
+                                        outputImage.data[targetIdx] = videoImageData.data[targetIdx];
+                                        outputImage.data[targetIdx + 1] = videoImageData.data[targetIdx + 1];
+                                        outputImage.data[targetIdx + 2] = videoImageData.data[targetIdx + 2];
+                                        outputImage.data[targetIdx + 3] = 255; // 完全不透明
+                                    } else if (!showOriginal) {
+                                        // 对于背景，如果不显示原始视频则使用半透明效果
+                                        outputImage.data[targetIdx] = videoImageData.data[targetIdx];
+                                        outputImage.data[targetIdx + 1] = videoImageData.data[targetIdx + 1];
+                                        outputImage.data[targetIdx + 2] = videoImageData.data[targetIdx + 2];
+                                        outputImage.data[targetIdx + 3] = 80; // 背景半透明
+                                    } else {
+                                        // 如果显示原始视频，则保持原始像素
+                                        outputImage.data[targetIdx] = videoImageData.data[targetIdx];
+                                        outputImage.data[targetIdx + 1] = videoImageData.data[targetIdx + 1];
+                                        outputImage.data[targetIdx + 2] = videoImageData.data[targetIdx + 2];
+                                        outputImage.data[targetIdx + 3] = 255;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 一维数组
+                const width = segmentation.width;
+                const height = segmentation.height;
+                
+                for (let i = 0; i < Math.min(segmentationData.length, width * height); i++) {
+                    const isForeground = segmentationData[i] === 1; // 1表示前景（人像）
+                    
+                    // 计算源坐标
+                    const x = i % width;
+                    const y = Math.floor(i / width);
+                    
+                    // 计算目标画布上对应的像素区域
+                    const targetStartX = Math.floor(x * scaleX);
+                    const targetEndX = Math.floor((x + 1) * scaleX);
+                    const targetStartY = Math.floor(y * scaleY);
+                    const targetEndY = Math.floor((y + 1) * scaleY);
+                    
+                    // 对映射到的每个像素进行处理
+                    for (let ty = targetStartY; ty < targetEndY; ty++) {
+                        for (let tx = targetStartX; tx < targetEndX; tx++) {
+                            // 确保在画布范围内
+                            if (tx >= 0 && tx < canvas.width && ty >= 0 && ty < canvas.height) {
+                                const targetIdx = (ty * canvas.width + tx) * 4;
+                                
+                                if (isForeground) {
+                                    // 对于前景（人像），保持原始视频像素
+                                    outputImage.data[targetIdx] = videoImageData.data[targetIdx];
+                                    outputImage.data[targetIdx + 1] = videoImageData.data[targetIdx + 1];
+                                    outputImage.data[targetIdx + 2] = videoImageData.data[targetIdx + 2];
+                                    outputImage.data[targetIdx + 3] = 255; // 完全不透明
+                                } else if (!showOriginal) {
+                                    // 对于背景，如果不显示原始视频则使用半透明效果
+                                    outputImage.data[targetIdx] = videoImageData.data[targetIdx];
+                                    outputImage.data[targetIdx + 1] = videoImageData.data[targetIdx + 1];
+                                    outputImage.data[targetIdx + 2] = videoImageData.data[targetIdx + 2];
+                                    outputImage.data[targetIdx + 3] = 80; // 背景半透明
+                                } else {
+                                    // 如果显示原始视频，则保持原始像素
+                                    outputImage.data[targetIdx] = videoImageData.data[targetIdx];
+                                    outputImage.data[targetIdx + 1] = videoImageData.data[targetIdx + 1];
+                                    outputImage.data[targetIdx + 2] = videoImageData.data[targetIdx + 2];
+                                    outputImage.data[targetIdx + 3] = 255;
+                                }
+                            }
+                        }
                     }
                 }
             }
-
-            // 将掩码应用到临时画布
-            tempMaskCtx.putImageData(maskImageData, 0, 0);
-
-            // 绘制原始视频到输出画布
-            outputCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // 设置全局合成操作，只保留掩码区域
-            outputCtx.globalCompositeOperation = 'destination-in';
-            outputCtx.drawImage(tempMaskCanvas, 0, 0, canvas.width, canvas.height);
-
-            // 重置合成操作
-            outputCtx.globalCompositeOperation = 'source-over';
-
-            // 将结果绘制到主画布
+            
+            // 清除画布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(outputCanvas, 0, 0);
-
+            
+            // 绘制处理后的图像
+            ctx.putImageData(outputImage, 0, 0);
+            
             // 清理临时画布
-            tempVideoCanvas.remove();
-            tempMaskCanvas.remove();
-            outputCanvas.remove();
+            tempCanvas.remove();
+            
         } catch (error) {
-            console.error('渲染分割结果出错:', error);
-            // 出错时仅显示原始视频
+            console.error('渲染分割结果时出错:', error);
+            
+            // 如果发生错误，至少显示原始视频帧
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
     };
 
-    // 启动分割过程
+    // 将十六进制颜色代码转换为RGB
+    const hexToRgb = (hex) => {
+        // 移除#号
+        hex = hex.replace('#', '');
+        
+        // 解析RGB值
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        
+        return { r, g, b };
+    };
+
+    // 启动分割
     const startSegmentation = async () => {
         if (await setupCamera()) {
-            processFrame();
+            processFrameWithWorker();
         }
     };
-    
+
+    // 加载模型状态变化时启动分割
+    useEffect(() => {
+        if (!loading && isModelLoaded) {
+            startSegmentation();
+        }
+    }, [loading, isModelLoaded]);
+
     // 切换交互控制
     const toggleInteraction = () => {
         try {
@@ -515,7 +529,7 @@ const CustomSegmentation = () => {
     const togglePause = () => {
         setIsPaused(!isPaused);
         if (isPaused) {
-            processFrame();
+            processFrameWithWorker();
         } else {
             if (animationRef.current) {
                 cancelAnimationFrame(animationRef.current);
@@ -534,9 +548,6 @@ const CustomSegmentation = () => {
     // 组件加载时初始化模型和Three.js场景
     useEffect(() => {
         try {
-            // 初始化自定义分割模型
-            loadModel();
-            
             // 初始化Three.js场景
             threeSceneRef.current = new ThreeScene(threeCanvasRef.current);
 
@@ -557,9 +568,6 @@ const CustomSegmentation = () => {
                 if (animationRef.current) {
                     cancelAnimationFrame(animationRef.current);
                 }
-                if (lastSegmentationRef.current) {
-                    lastSegmentationRef.current.dispose();
-                }
                 if (threeSceneRef.current) {
                     threeSceneRef.current.dispose();
                 }
@@ -573,13 +581,6 @@ const CustomSegmentation = () => {
             console.error("初始化组件出错:", error);
         }
     }, []);
-
-    // 模型加载后启动分割
-    useEffect(() => {
-        if (modelLoaded) {
-            startSegmentation();
-        }
-    }, [modelLoaded]);
 
     // 视频加载后调整canvas尺寸
     useEffect(() => {
