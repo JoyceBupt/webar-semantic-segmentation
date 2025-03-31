@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as tf from '@tensorflow/tfjs';
-import ThreeScene from './three/Scene';
+import ThreeScene from './three/ThreeScene';
 import { useCamera } from '../hooks/useCamera';
 import { useFPS } from '../hooks/useFPS';
 import { CUSTOM_CLASSES } from '../constants/customSegmentationClasses';
@@ -182,6 +182,8 @@ const CustomSegmentation = () => {
                     
                     // 将坐标转换为 Three.js 坐标系统
                     const normalizedX = (centerX / width) * 2 - 1;
+                    
+                    // 移除额外的垂直偏移，恢复到质心位置
                     const normalizedY = -(centerY / height) * 2 + 1;
                     
                     // 计算物体大小比例
