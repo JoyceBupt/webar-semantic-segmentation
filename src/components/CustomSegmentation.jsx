@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import * as tf from '@tensorflow/tfjs';
 import ThreeScene from './three/ThreeScene';
 import { useCamera } from '../hooks/useCamera';
 import { useFPS } from '../hooks/useFPS';
-import { CUSTOM_CLASSES } from '../constants/customSegmentationClasses';
 import UIControlPanel from './UIControlPanel';
 import { useSegmentationWorker } from '../hooks/useSegmentationWorker';
 
@@ -11,9 +9,7 @@ const CustomSegmentation = () => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const threeCanvasRef = useRef(null); // 添加Three.js画布引用
-    
     const threeSceneRef = useRef(null); // 添加Three.js场景引用
-    
     const [loading, setLoading] = useState(true);
     const [modelLoaded, setModelLoaded] = useState(false);
     // 保留这些状态变量，因为它们在渲染过程中仍然需要使用
@@ -36,15 +32,15 @@ const CustomSegmentation = () => {
 
     const { fps, updateFPS } = useFPS();
     const { setupCamera } = useCamera(videoRef);
-    
+
     // 使用Worker Hook替代直接的模型处理
-    const { 
-        status, 
-        error, 
+    const {
+        status,
+        error,
         isModelLoaded,
         isTfInitialized,
-        loadModel, 
-        processFrame 
+        loadModel,
+        processFrame
     } = useSegmentationWorker();
 
     // 调整canvas尺寸以匹配视频比例
@@ -59,7 +55,7 @@ const CustomSegmentation = () => {
                     canvasRef.current.height = videoHeight;
                     threeCanvasRef.current.width = videoWidth;
                     threeCanvasRef.current.height = videoHeight;
-                    
+
                     // 如果有Three.js场景，通知其更新尺寸
                     if (threeSceneRef.current) {
                         threeSceneRef.current.updateSize(videoWidth, videoHeight);
@@ -85,16 +81,16 @@ const CustomSegmentation = () => {
         if (!isTfInitialized) {
             return;
         }
-        
+
         const modelUrl = '/model/model.json';
         setLoading(true);
-        
+
         // 为自定义模型提供正确的配置
         const customModelConfig = {
             inputShape: [256, 144], // 正确的输入尺寸
             inputFormat: 'NCHW'
         };
-        
+
         loadModel(modelUrl, customModelConfig)
             .then(() => {
                 setLoading(false);
@@ -104,7 +100,7 @@ const CustomSegmentation = () => {
                 setLoading(false);
             });
     }, [loadModel, isTfInitialized]);
-    
+
     // 处理Worker错误
     useEffect(() => {
         if (error) {
@@ -127,26 +123,26 @@ const CustomSegmentation = () => {
 
             // 使用Worker处理分割
             const segmentation = await processFrame(video);
-            
+
             if (!segmentation || !segmentation.data) {
                 return;
             }
-            
+
             // 渲染分割结果
             await renderSegmentation(video, segmentation, canvas);
-            
+
             // 处理分割结果，更新3D模型位置
             try {
                 // 从掩码数据创建position数据
                 const maskData = segmentation.data;
-                const isNestedArray = segmentation.shape === 'nested' || 
+                const isNestedArray = segmentation.shape === 'nested' ||
                     (Array.isArray(maskData) && Array.isArray(maskData[0]));
-                
+
                 // 计算质心
                 let centerX = 0;
                 let centerY = 0;
                 let count = 0;
-                
+
                 // 获取实际尺寸
                 const height = segmentation.height;
                 const width = segmentation.width;
@@ -175,21 +171,21 @@ const CustomSegmentation = () => {
                         }
                     }
                 }
-                
+
                 if (count > 0) {
                     centerX /= count;
                     centerY /= count;
-                    
+
                     // 将坐标转换为 Three.js 坐标系统
                     const normalizedX = (centerX / width) * 2 - 1;
-                    
+
                     // 移除额外的垂直偏移，恢复到质心位置
                     const normalizedY = -(centerY / height) * 2 + 1;
-                    
+
                     // 计算物体大小比例
                     const objectSize = Math.sqrt(count / (width * height));
                     const scale = Math.max(0.3, Math.min(1, objectSize * 2));
-                    
+
                     // 更新模型位置
                     if (threeSceneRef.current) {
                         threeSceneRef.current.updateModelPosition(normalizedX, normalizedY, scale);
@@ -224,9 +220,9 @@ const CustomSegmentation = () => {
         try {
             // 获取分割掩码数据
             const segmentationData = segmentation.data;
-            const isNestedArray = segmentation.shape === 'nested' || 
+            const isNestedArray = segmentation.shape === 'nested' ||
                 (Array.isArray(segmentationData) && Array.isArray(segmentationData[0]));
-            
+
             // 先绘制完整视频帧到临时画布
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = canvas.width;
@@ -234,34 +230,34 @@ const CustomSegmentation = () => {
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const videoImageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
-            
+
             // 创建输出图像数据
             const outputImage = ctx.createImageData(canvas.width, canvas.height);
-            
+
             // 缩放因子 - 用于将分割结果映射到画布尺寸
             const scaleX = canvas.width / segmentation.width;
             const scaleY = canvas.height / segmentation.height;
-            
+
             // 处理数据 - 创建遮罩
             if (isNestedArray) {
                 // 二维数组
                 for (let y = 0; y < segmentation.height; y++) {
                     for (let x = 0; x < segmentation.width; x++) {
                         const isForeground = segmentationData[y][x] === 1; // 1表示前景（人像）
-                        
+
                         // 计算目标画布上对应的像素区域
                         const targetStartX = Math.floor(x * scaleX);
                         const targetEndX = Math.floor((x + 1) * scaleX);
                         const targetStartY = Math.floor(y * scaleY);
                         const targetEndY = Math.floor((y + 1) * scaleY);
-                        
+
                         // 对映射到的每个像素进行处理
                         for (let ty = targetStartY; ty < targetEndY; ty++) {
                             for (let tx = targetStartX; tx < targetEndX; tx++) {
                                 // 确保在画布范围内
                                 if (tx >= 0 && tx < canvas.width && ty >= 0 && ty < canvas.height) {
                                     const targetIdx = (ty * canvas.width + tx) * 4;
-                                    
+
                                     if (isForeground) {
                                         // 对于前景（人像），保持原始视频像素
                                         outputImage.data[targetIdx] = videoImageData.data[targetIdx];
@@ -290,27 +286,27 @@ const CustomSegmentation = () => {
                 // 一维数组
                 const width = segmentation.width;
                 const height = segmentation.height;
-                
+
                 for (let i = 0; i < Math.min(segmentationData.length, width * height); i++) {
                     const isForeground = segmentationData[i] === 1; // 1表示前景（人像）
-                    
+
                     // 计算源坐标
                     const x = i % width;
                     const y = Math.floor(i / width);
-                    
+
                     // 计算目标画布上对应的像素区域
                     const targetStartX = Math.floor(x * scaleX);
                     const targetEndX = Math.floor((x + 1) * scaleX);
                     const targetStartY = Math.floor(y * scaleY);
                     const targetEndY = Math.floor((y + 1) * scaleY);
-                    
+
                     // 对映射到的每个像素进行处理
                     for (let ty = targetStartY; ty < targetEndY; ty++) {
                         for (let tx = targetStartX; tx < targetEndX; tx++) {
                             // 确保在画布范围内
                             if (tx >= 0 && tx < canvas.width && ty >= 0 && ty < canvas.height) {
                                 const targetIdx = (ty * canvas.width + tx) * 4;
-                                
+
                                 if (isForeground) {
                                     // 对于前景（人像），保持原始视频像素
                                     outputImage.data[targetIdx] = videoImageData.data[targetIdx];
@@ -335,19 +331,19 @@ const CustomSegmentation = () => {
                     }
                 }
             }
-            
+
             // 清除画布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
+
             // 绘制处理后的图像
             ctx.putImageData(outputImage, 0, 0);
-            
+
             // 清理临时画布
             tempCanvas.remove();
-            
+
         } catch (error) {
             console.error('渲染分割结果时出错:', error);
-            
+
             // 如果发生错误，至少显示原始视频帧
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
@@ -357,12 +353,12 @@ const CustomSegmentation = () => {
     const hexToRgb = (hex) => {
         // 移除#号
         hex = hex.replace('#', '');
-        
+
         // 解析RGB值
         const r = parseInt(hex.substring(0, 2), 16);
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
-        
+
         return { r, g, b };
     };
 
@@ -393,7 +389,7 @@ const CustomSegmentation = () => {
             console.error("切换交互控制出错:", error);
         }
     };
-    
+
     // 重置模型变换
     const resetModelTransform = () => {
         try {
@@ -402,12 +398,12 @@ const CustomSegmentation = () => {
             console.error("重置模型变换出错:", error);
         }
     };
-    
+
     // 关闭提示
     const closeTips = () => {
         setShowTips(false);
     };
-    
+
     // 切换模型
     const handleModelChange = (index) => {
         try {
@@ -428,7 +424,7 @@ const CustomSegmentation = () => {
             setTimeout(() => setModelError(null), 3000);
         }
     };
-    
+
     // 切换动画
     const handleAnimationChange = (index) => {
         try {
@@ -440,7 +436,7 @@ const CustomSegmentation = () => {
             console.error("切换动画出错:", error);
         }
     };
-    
+
     // 更新动画选项列表
     const updateAnimationOptions = () => {
         try {
@@ -456,7 +452,7 @@ const CustomSegmentation = () => {
             setAnimationOptions([]);
         }
     };
-    
+
     // 切换粒子效果
     const toggleEffects = () => {
         try {
@@ -477,7 +473,7 @@ const CustomSegmentation = () => {
     const getModelTypes = () => {
         const types = {};
         if (!modelOptions || modelOptions.length === 0) return [];
-        
+
         modelOptions.forEach(model => {
             if (!model || !model.name) return;
             // 获取名称中的模型类型（如"狐狸"或"小鸟"）
@@ -486,27 +482,27 @@ const CustomSegmentation = () => {
                 types[typeName] = true;
             }
         });
-        
+
         return Object.keys(types);
     };
-    
+
     // 按模型类型筛选模型选项
     const getModelsByType = (type) => {
         if (!modelOptions || modelOptions.length === 0 || !type) return [];
         return modelOptions.filter(model => model && model.name && model.name.startsWith(type));
     };
-    
+
     // 获取当前选中模型的类型
     const getCurrentModelType = () => {
-        if (!modelOptions || modelOptions.length === 0 || 
-            currentModelIndex >= modelOptions.length || 
+        if (!modelOptions || modelOptions.length === 0 ||
+            currentModelIndex >= modelOptions.length ||
             !modelOptions[currentModelIndex] ||
             !modelOptions[currentModelIndex].name) return "";
-            
+
         const currentModel = modelOptions[currentModelIndex];
         return currentModel.name.split('(')[0].trim();
     };
-    
+
     // 切换模型类型
     const handleModelTypeChange = (type) => {
         try {
@@ -564,7 +560,7 @@ const CustomSegmentation = () => {
 
             // 使用 requestAnimationFrame 确保 canvas 已挂载
             requestAnimationFrame(initThreeScene);
-            
+
             // 组件卸载时清理
             return () => {
                 if (animationRef.current) {
@@ -614,13 +610,13 @@ const CustomSegmentation = () => {
                     <p>模型加载中</p>
                 </div>
             )}
-            
+
             {modelError && (
                 <div className="error-message">
                     <p>{modelError}</p>
                 </div>
             )}
-            
+
             {showTips && (
                 <div className="tips-overlay">
                     <div className="tips-content">
@@ -637,7 +633,7 @@ const CustomSegmentation = () => {
                     </div>
                 </div>
             )}
-            
+
             <div className="video-container">
                 <video
                     ref={videoRef}
@@ -664,16 +660,16 @@ const CustomSegmentation = () => {
                     }}
                 />
             </div>
-            
+
             <div className="segmentation-controls">
                 <div className="basic-controls" style={{ margin: '10px 0', padding: '10px', background: '#f0f0f0', borderRadius: '5px', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
                     <div className="fps-display" style={{ fontWeight: 'bold' }}>
                         FPS: {fps.toFixed(1)}
                     </div>
                 </div>
-                
+
                 {/* 使用UI控制面板 */}
-                <UIControlPanel 
+                <UIControlPanel
                     fps={fps}
                     modelOptions={modelOptions}
                     currentModelIndex={currentModelIndex}

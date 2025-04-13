@@ -27,8 +27,6 @@ const initialize = async () => {
     });
   }
 };
-
-// 立即初始化
 initialize();
 
 // 处理来自主线程的消息
@@ -45,7 +43,6 @@ self.onmessage = async function (e) {
         self.postMessage({ type: "ERROR", error: "Model not loaded" });
         return;
       }
-
       try {
         const result = await processFrame(
           data.imageData,
@@ -180,6 +177,7 @@ async function processFrame(imageData, width, height) {
       segmentationData = Array.from(segmentationData);
     } catch (error) {
       // 如果dataSync不可用，回退到arraySync
+      console.log("dataSync failed, using arraySync instead", error);
       const arrayData = await segmentationTensor.arraySync();
       segmentationData = convertToSerializableData(arrayData[0]);
     }

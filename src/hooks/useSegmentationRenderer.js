@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import * as tf from "@tensorflow/tfjs";
 
 export const useSegmentationRenderer = (canvasRef) => {
   const renderSegmentation = useCallback(
@@ -143,6 +142,7 @@ export const useSegmentationRenderer = (canvasRef) => {
       } catch (error) {
         // 出错时只显示原始视频
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        console.error("Error rendering segmentation:", error);
       } finally {
         // 清理临时画布
         tempCanvas.remove();

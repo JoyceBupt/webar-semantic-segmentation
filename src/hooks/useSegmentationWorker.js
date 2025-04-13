@@ -22,8 +22,6 @@ export const useSegmentationWorker = () => {
           type,
           status: workerStatus,
           error: workerError,
-          segmentation,
-          backend,
         } = e.data;
 
         switch (type) {
@@ -71,7 +69,6 @@ export const useSegmentationWorker = () => {
         if (!workerRef.current) {
           return reject("Worker not initialized");
         }
-
         // 确保TensorFlow已初始化
         if (!isTfInitialized) {
           // 等待TensorFlow初始化
@@ -100,11 +97,21 @@ export const useSegmentationWorker = () => {
             const { type, status: modelStatus, error: loadError } = e.data;
 
             if (type === "STATUS" && modelStatus === "MODEL_LOADED") {
-              workerRef.current.removeEventListener("message", messageHandler);
+              if (workerRef.current) {
+                workerRef.current.removeEventListener(
+                  "message",
+                  messageHandler
+                );
+              }
               setIsModelLoaded(true);
               resolve();
             } else if (type === "ERROR") {
-              workerRef.current.removeEventListener("message", messageHandler);
+              if (workerRef.current) {
+                workerRef.current.removeEventListener(
+                  "message",
+                  messageHandler
+                );
+              }
               reject(loadError);
             }
           };
@@ -123,7 +130,9 @@ export const useSegmentationWorker = () => {
 
           // 设置超时，以防模型无法加载
           const timeout = setTimeout(() => {
-            workerRef.current.removeEventListener("message", messageHandler);
+            if (workerRef.current) {
+              workerRef.current.removeEventListener("message", messageHandler);
+            }
             reject("Model loading timed out");
           }, 30000); // 30秒超时
 
@@ -171,8 +180,13 @@ export const useSegmentationWorker = () => {
             const { type, segmentation, error: workerError } = e.data;
 
             if (type === "SEGMENTATION_RESULT") {
-              workerRef.current.removeEventListener("message", messageHandler);
-              workerRef.current.removeEventListener("error", errorHandler);
+              if (workerRef.current) {
+                workerRef.current.removeEventListener(
+                  "message",
+                  messageHandler
+                );
+                workerRef.current.removeEventListener("error", errorHandler);
+              }
               clearTimeout(timeout);
 
               // 确保结果中有所有需要的数据
@@ -182,8 +196,13 @@ export const useSegmentationWorker = () => {
                 reject("Invalid segmentation result received from worker");
               }
             } else if (type === "ERROR") {
-              workerRef.current.removeEventListener("message", messageHandler);
-              workerRef.current.removeEventListener("error", errorHandler);
+              if (workerRef.current) {
+                workerRef.current.removeEventListener(
+                  "message",
+                  messageHandler
+                );
+                workerRef.current.removeEventListener("error", errorHandler);
+              }
               clearTimeout(timeout);
               reject(workerError);
             }
@@ -191,8 +210,10 @@ export const useSegmentationWorker = () => {
 
           // 添加错误处理
           const errorHandler = (err) => {
-            workerRef.current.removeEventListener("message", messageHandler);
-            workerRef.current.removeEventListener("error", errorHandler);
+            if (workerRef.current) {
+              workerRef.current.removeEventListener("message", messageHandler);
+              workerRef.current.removeEventListener("error", errorHandler);
+            }
             clearTimeout(timeout);
             reject(`Worker error: ${err.message}`);
           };
@@ -202,8 +223,10 @@ export const useSegmentationWorker = () => {
 
           // 设置超时以防止无限等待
           const timeout = setTimeout(() => {
-            workerRef.current.removeEventListener("message", messageHandler);
-            workerRef.current.removeEventListener("error", errorHandler);
+            if (workerRef.current) {
+              workerRef.current.removeEventListener("message", messageHandler);
+              workerRef.current.removeEventListener("error", errorHandler);
+            }
             reject("Frame processing timed out");
           }, 5000); // 5秒超时
 
@@ -222,8 +245,10 @@ export const useSegmentationWorker = () => {
             ); // 使用transferable objects提高性能
           } catch (postError) {
             clearTimeout(timeout);
-            workerRef.current.removeEventListener("message", messageHandler);
-            workerRef.current.removeEventListener("error", errorHandler);
+            if (workerRef.current) {
+              workerRef.current.removeEventListener("message", messageHandler);
+              workerRef.current.removeEventListener("error", errorHandler);
+            }
             reject(`Failed to send data to worker: ${postError.message}`);
           }
 

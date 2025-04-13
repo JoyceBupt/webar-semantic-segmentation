@@ -77,7 +77,7 @@ function App() {
                   </div>
                 </div>
                 <div className="device-tip">
-                  {isMobile ? 
+                  {isMobile ?
                     <p>💡 提示：为获得更好体验，请确保相机已授权并保持设备稳定</p> :
                     <p>💡 提示：确保您的设备有摄像头并已授权访问</p>
                   }
